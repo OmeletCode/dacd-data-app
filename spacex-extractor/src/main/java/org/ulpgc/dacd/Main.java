@@ -1,4 +1,4 @@
-package org.ulpgc.dacd.spacex;
+package org.ulpgc.dacd;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;

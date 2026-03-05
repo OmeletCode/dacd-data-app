@@ -13,8 +13,6 @@
     <modules>
         <module>spacex-extractor</module>
         <module>sitycleta-extractor</module>
-        <module>spacex-extractor</module>
-        <module>sitycleta-extractor</module>
     </modules>
 
     <properties>
