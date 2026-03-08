@@ -12,7 +12,7 @@
 
     <modules>
         <module>spacex-extractor</module>
-        <module>sitycleta-extractor</module>
+        <module>weather-extractor</module>
     </modules>
 
     <properties>
