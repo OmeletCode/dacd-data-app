@@ -7,6 +7,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.io.IOException;
+import java.time.Instant; // --- NUEVO: Importante para el Timestamp ---
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,8 +16,8 @@ public class RestSpaceXSupplier implements SpaceXSupplier {
     private final String url = "https://api.spacexdata.com/v4/starlink";
 
     @Override
-    public List<Satellite> getSatellites() {
-        List<Satellite> satellites = new ArrayList<>();
+    public List<SpaceXEvent> getSatellites() {
+        List<SpaceXEvent> eventos = new ArrayList<>();
         Request request = new Request.Builder().url(url).build();
 
         try (Response response = client.newCall(request).execute()) {
@@ -36,14 +37,20 @@ public class RestSpaceXSupplier implements SpaceXSupplier {
 
                     double lat = obj.has("latitude") && !obj.get("latitude").isJsonNull() ? obj.get("latitude").getAsDouble() : 0.0;
                     double lon = obj.has("longitude") && !obj.get("longitude").isJsonNull() ? obj.get("longitude").getAsDouble() : 0.0;
-                    double vel = obj.has("velocity_kms") && !obj.get("velocity_kms").isJsonNull() ? obj.get("velocity_kms").getAsDouble() : 0.0;
+                    //double vel = obj.has("velocity_kms") && !obj.get("velocity_kms").isJsonNull() ? obj.get("velocity_kms").getAsDouble() : 0.0;
 
-                    satellites.add(new Satellite(name, lat, lon, vel, obj.toString()));
+
+                    String ts = Instant.now().toString(); // Timestamp en formato UTC
+                    String ss = "SpaceX-Feeder";          // El origen del dato
+
+                    SpaceXEvent evento = new SpaceXEvent(ts, ss, name, lat, lon);
+
+                    eventos.add(evento);
                 }
             }
         } catch (IOException e) {
             System.err.println("Error obteniendo datos de SpaceX: " + e.getMessage());
         }
-        return satellites;
+        return eventos;
     }
 }

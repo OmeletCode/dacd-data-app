@@ -5,8 +5,8 @@ import com.google.gson.JsonParser;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
-import org.ulpgc.dacd.model.Weather;
 import java.io.IOException;
+import java.time.Instant; // --- NUEVO: Importante para el Timestamp ---
 
 public class WeatherSupplier {
     private String apiKey;
@@ -16,7 +16,8 @@ public class WeatherSupplier {
         this.apiKey = apiKey;
     }
 
-    public Weather get(double lat, double lon) throws IOException {
+    // --- NUEVO: Ahora devolvemos un WeatherEvent en lugar de Weather ---
+    public WeatherEvent get(double lat, double lon) throws IOException {
         String url = "https://api.openweathermap.org/data/2.5/weather?lat=" + lat + "&lon=" + lon + "&appid=" + apiKey + "&units=metric";
 
         Request request = new Request.Builder().url(url).build();
@@ -25,6 +26,7 @@ public class WeatherSupplier {
             String body = response.body().string();
             JsonObject json = JsonParser.parseString(body).getAsJsonObject();
 
+            // 1. Tu código antiguo que saca los datos
             long dt = json.get("dt").getAsLong();
             double t = json.get("main").getAsJsonObject().get("temp").getAsDouble();
             int h = json.get("main").getAsJsonObject().get("humidity").getAsInt();
@@ -32,7 +34,13 @@ public class WeatherSupplier {
             String d = json.get("weather").getAsJsonArray().get(0).getAsJsonObject().get("description").getAsString();
             String n = json.get("name").getAsString();
 
-            return new Weather(dt, t, h, w, d, n);
+            // --- NUEVO: APLICANDO EL PUNTO 5 ---
+            // 2. Generamos los campos obligatorios del evento
+            String ts = Instant.now().toString(); // Timestamp en formato UTC
+            String ss = "Weather-Feeder";         // El origen del dato
+
+            // 3. Creamos el Evento con todos los datos y lo devolvemos
+            return new WeatherEvent(ts, ss, dt, t, h, w, d, n, lat, lon);
         }
     }
 }

@@ -1,38 +1,40 @@
 package org.ulpgc.dacd.control;
 
-import org.ulpgc.dacd.model.Weather;
 import java.util.Timer;
 import java.util.TimerTask;
 
 public class WeatherController {
     private final WeatherSupplier supplier;
-    private final WeatherSerializer serializer;
 
-    public WeatherController(WeatherSupplier supplier, WeatherSerializer serializer) {
+    public WeatherController(WeatherSupplier supplier) {
         this.supplier = supplier;
-        this.serializer = serializer;
     }
 
     public void execute() {
         Timer timer = new Timer();
+        GsonEventSerializer jsonSerializer = new GsonEventSerializer();
+
+        // --- PUNTO 7: Instanciamos el cartero para el canal del clima ---
+        ActiveMQMessageSender sender = new ActiveMQMessageSender("prediction.Weather");
 
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                System.out.println("Obteniendo datos meteorológicos...");
+                System.out.println("\n[ " + java.time.LocalTime.now() + " ] Obteniendo datos meteorológicos...");
                 try {
-                    // Usamos tu método real con las coordenadas de Las Palmas
-                    Weather weather = supplier.get(28.12, -15.43);
+                    WeatherEvent weatherEvent = supplier.get(28.12, -15.43);
 
-                    if (weather != null) {
-                        // Ahora le pasamos el objeto COMPLETO a la base de datos, no pieza a pieza
-                        serializer.saveWeather(weather);
-                        System.out.println("Clima de " + weather.location() + " guardado en la DB común.");
+                    if (weatherEvent != null) {
+                        // 1. Pasamos a texto (Punto 6)
+                        String json = jsonSerializer.serialize(weatherEvent);
+
+                        // 2. Lo enviamos por internet al Broker (Punto 7)
+                        sender.sendMessage(json);
                     }
                 } catch (Exception e) {
                     System.err.println("Error al capturar el clima: " + e.getMessage());
                 }
             }
-        }, 0, 15 * 60 * 1000);
+        }, 0, 15 * 60 * 1000); // Se ejecuta cada 15 minutos
     }
 }

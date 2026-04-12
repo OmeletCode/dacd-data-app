@@ -2,8 +2,6 @@ package org.ulpgc.dacd;
 
 import org.ulpgc.dacd.control.WeatherController;
 import org.ulpgc.dacd.control.WeatherSupplier;
-import org.ulpgc.dacd.control.SqliteWeatherSerializer;
-import org.ulpgc.dacd.control.WeatherSerializer;
 
 public class Main {
     public static void main(String[] args) {
@@ -11,15 +9,13 @@ public class Main {
         String key = "abe03c99d7dcf2d52fa36ac4b4622a66";
         WeatherSupplier supplier = new WeatherSupplier(key);
 
-        // 2. Instanciamos el guardado en base de datos
-        String dbUrl = "jdbc:sqlite:spacex_data.db";
-        WeatherSerializer serializer = new SqliteWeatherSerializer(dbUrl);
+        // Ya no usamos la base de datos, así que borramos esa parte
 
-        // 3. Ensamblamos el controlador pasándole las dos piezas
-        WeatherController controller = new WeatherController(supplier, serializer);
+        // 2. Ensamblamos el controlador pasándole solo el supplier
+        WeatherController controller = new WeatherController(supplier);
 
-        // 4. ¡Arrancamos el motor!
-        System.out.println("Iniciando recolector de clima...");
+        // 3. ¡Arrancamos el motor!
+        System.out.println("--- Iniciando recolector de clima (JSON Ready) ---");
         controller.execute();
     }
 }

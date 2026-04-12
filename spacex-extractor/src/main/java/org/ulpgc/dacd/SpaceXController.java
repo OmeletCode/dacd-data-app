@@ -6,27 +6,30 @@ import java.util.TimerTask;
 
 public class SpaceXController {
     private final SpaceXSupplier supplier;
-    private final SpaceXSerializer serializer;
 
-    public SpaceXController(SpaceXSupplier supplier, SpaceXSerializer serializer) {
+    public SpaceXController(SpaceXSupplier supplier) {
         this.supplier = supplier;
-        this.serializer = serializer;
     }
 
     public void execute() {
         Timer timer = new Timer();
+        GsonEventSerializer jsonSerializer = new GsonEventSerializer();
+
+        ActiveMQMessageSender sender = new ActiveMQMessageSender("sensor.SpaceX");
+
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                System.out.println("\n[ " + java.time.LocalTime.now() + " ] Iniciando ciclo de captura...");
-                List<Satellite> satellites = supplier.getSatellites();
+                System.out.println("\n[ " + java.time.LocalTime.now() + " ] Iniciando captura de SpaceX...");
+                List<SpaceXEvent> eventos = supplier.getSatellites();
 
-                if (satellites != null && !satellites.isEmpty()) {
-                    System.out.println("Guardando " + satellites.size() + " satélites en SQLite...");
-                    for (Satellite sat : satellites) {
-                        serializer.saveSatellite(sat);
+                if (eventos != null && !eventos.isEmpty()) {
+                    for (SpaceXEvent evento : eventos) {
+                        String json = jsonSerializer.serialize(evento);
+
+                        sender.sendMessage(json);
                     }
-                    System.out.println("¡Ciclo completado con éxito!");
+                    System.out.println("-> Enviados " + eventos.size() + " satélites a ActiveMQ.");
                 } else {
                     System.out.println("No se pudieron obtener satélites en este ciclo.");
                 }
