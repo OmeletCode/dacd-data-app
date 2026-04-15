@@ -1,43 +1,41 @@
-package org.ulpgc.dacd; // Cambia esto según tu paquete
+package org.ulpgc.dacd;
 
 import org.apache.activemq.ActiveMQConnectionFactory;
 import javax.jms.*;
+import java.util.List;
 
 public class ActiveMQMessageSender {
-    // La dirección de tu Broker (la misma que comprobamos en el Punto 1)
     private static final String URL = "tcp://localhost:61616";
     private final String topicName;
 
-    // Al construir el cartero, le decimos a qué "Canal" (Topic) debe enviar el mensaje
     public ActiveMQMessageSender(String topicName) {
         this.topicName = topicName;
     }
 
-    public void sendMessage(String jsonEvent) {
+    // AHORA RECIBE UNA LISTA DE JSONs
+    public void sendMessages(List<String> jsonEvents) {
         try {
-            // 1. Conectamos con ActiveMQ
+            // 1. Abrimos la puerta UNA SOLA VEZ
             ConnectionFactory connectionFactory = new ActiveMQConnectionFactory(URL);
             Connection connection = connectionFactory.createConnection();
             connection.start();
-
-            // 2. Creamos una sesión
             Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
-
-            // 3. Buscamos el buzón/canal (Topic)
             Destination destination = session.createTopic(topicName);
             MessageProducer producer = session.createProducer(destination);
 
-            // 4. Metemos nuestro JSON en un mensaje de texto y lo enviamos
-            TextMessage message = session.createTextMessage(jsonEvent);
-            producer.send(message);
+            // 2. Enviamos todos los mensajes por la misma conexión
+            for (String json : jsonEvents) {
+                TextMessage message = session.createTextMessage(json);
+                producer.send(message);
+            }
 
-            System.out.println("-> Mensaje enviado con éxito al topic: " + topicName);
+            System.out.println("-> " + jsonEvents.size() + " mensajes enviados con éxito al topic: " + topicName);
 
-            // 5. Cerramos la conexión para no dejar puertas abiertas
+            // 3. Cerramos la puerta
             connection.close();
 
         } catch (JMSException e) {
-            System.err.println("Error al enviar el mensaje a ActiveMQ: " + e.getMessage());
+            System.err.println("Error al enviar mensajes a ActiveMQ: " + e.getMessage());
         }
     }
 }

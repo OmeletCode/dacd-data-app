@@ -1,5 +1,6 @@
 package org.ulpgc.dacd;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -14,7 +15,6 @@ public class SpaceXController {
     public void execute() {
         Timer timer = new Timer();
         GsonEventSerializer jsonSerializer = new GsonEventSerializer();
-
         ActiveMQMessageSender sender = new ActiveMQMessageSender("sensor.SpaceX");
 
         timer.scheduleAtFixedRate(new TimerTask() {
@@ -24,16 +24,20 @@ public class SpaceXController {
                 List<SpaceXEvent> eventos = supplier.getSatellites();
 
                 if (eventos != null && !eventos.isEmpty()) {
-                    for (SpaceXEvent evento : eventos) {
-                        String json = jsonSerializer.serialize(evento);
+                    List<String> jsonEvents = new ArrayList<>();
 
-                        sender.sendMessage(json);
+                    // Convertimos todos los eventos a JSON y los guardamos en la lista
+                    for (SpaceXEvent evento : eventos) {
+                        jsonEvents.add(jsonSerializer.serialize(evento));
                     }
-                    System.out.println("-> Enviados " + eventos.size() + " satélites a ActiveMQ.");
+
+                    // Enviamos la lista completa de golpe
+                    sender.sendMessages(jsonEvents);
+
                 } else {
                     System.out.println("No se pudieron obtener satélites en este ciclo.");
                 }
             }
-        }, 0, 3600000); // Se ejecuta cada hora
+        }, 0, 3600000);
     }
 }

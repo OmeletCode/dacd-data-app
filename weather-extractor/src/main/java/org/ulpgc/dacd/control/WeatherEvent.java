@@ -16,9 +16,9 @@ public class WeatherEvent {
     private double lon;
 
     // --- CONSTRUCTOR ---
-    public WeatherEvent(String ts, String String, long dt, double temp, int humidity, double windSpeed, String description, String name, double lat, double lon) {
+    public WeatherEvent(String ts, String ss, long dt, double temp, int humidity, double windSpeed, String description, String name, double lat, double lon) {
         this.ts = ts;
-        this.ss = String; // Fíjate que le paso el identificador del feeder
+        this.ss = ss;
         this.dt = dt;
         this.temp = temp;
         this.humidity = humidity;
