@@ -5,7 +5,7 @@ import javax.jms.*;
 import java.util.List;
 
 public class ActiveMQMessageSender {
-    private static final String URL = "tcp://localhost:61616";
+    private static final String URL = "failover:(tcp://localhost:61616)";
     private final String topicName;
 
     public ActiveMQMessageSender(String topicName) {

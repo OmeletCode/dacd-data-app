@@ -4,7 +4,7 @@ import org.apache.activemq.ActiveMQConnectionFactory;
 import javax.jms.*;
 
 public class ActiveMQSubscriber {
-    private static final String URL = "tcp://localhost:61616";
+    private static final String URL = "failover:(tcp://localhost:61616)";
     // El ID es obligatorio para que la suscripción sea "Duradera"
     private static final String CLIENT_ID = "EventStoreBuilder-Node1";
 

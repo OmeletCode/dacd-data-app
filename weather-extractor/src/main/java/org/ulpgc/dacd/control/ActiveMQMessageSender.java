@@ -5,7 +5,7 @@ import javax.jms.*;
 
 public class ActiveMQMessageSender {
     // La dirección de tu Broker (la misma que comprobamos en el Punto 1)
-    private static final String URL = "tcp://localhost:61616";
+    private static final String URL = "failover:(tcp://localhost:61616)";
     private final String topicName;
 
     // Al construir el cartero, le decimos a qué "Canal" (Topic) debe enviar el mensaje
