@@ -14,6 +14,7 @@
         <module>spacex-extractor</module>
         <module>weather-extractor</module>
         <module>event-store-builder</module>
+        <module>business-unit</module>
     </modules>
 
     <properties>
