@@ -1,6 +1,7 @@
 package org.ulpgc.dacd;
 
 import io.javalin.Javalin;
+import org.ulpgc.dacd.broker.ActiveMQSubscriber;
 import org.ulpgc.dacd.model.WeatherEvent;
 import org.ulpgc.dacd.reader.EventStoreReader;
 
@@ -28,6 +29,8 @@ public class Main {
         }
         System.out.println("--------------------------------------------------");
 
+        ActiveMQSubscriber subscriber = new ActiveMQSubscriber();
+        subscriber.start();
         // --- LEVANTAR EL SERVIDOR JAVALIN ---
         Javalin app = Javalin.create().start(8080);
 
