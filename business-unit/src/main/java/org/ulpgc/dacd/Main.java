@@ -33,12 +33,12 @@ public class Main {
         subscriber.start();
 
         // 🚀 4. ABRIMOS LA PUERTA AL FUTURO (Javalin API)
-        Javalin app = Javalin.create().start(8080);
+        // --- LEVANTAR EL SERVIDOR JAVALIN ---
+        Javalin app = Javalin.create(config -> {
+            // Le decimos a Javalin que aloje nuestra página web estática
+            config.staticFiles.add("/public");
+        }).start(8080);
 
-        app.get("/", ctx -> {
-            ctx.result("🚀 ¡API del Monitor Predictivo funcionando! Datos en memoria: " +
-                    dataMart.getWeatherEvents().size() + " predicciones climáticas.");
-        });
 
         // Tu endpoint para la web
         // Ruta 2: El Endpoint DEFINITIVO con Lógica de Negocio

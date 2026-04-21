@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Monitor Predictivo de Rain Fade</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e2f; color: white; text-align: center; padding: 50px; }
+        .card { background-color: #2a2a40; padding: 30px; border-radius: 15px; box-shadow: 0 10px 20px rgba(0,0,0,0.5); display: inline-block; width: 400px; }
+        h1 { color: #00d2ff; }
+        .risk-LOW { color: #00ff88; font-weight: bold; font-size: 24px; }
+        .risk-MEDIUM { color: #ffcc00; font-weight: bold; font-size: 24px; }
+        .risk-HIGH { color: #ff3366; font-weight: bold; font-size: 24px; }
+        button { background: #00d2ff; color: #1e1e2f; border: none; padding: 10px 20px; font-size: 16px; border-radius: 5px; cursor: pointer; margin-top: 20px; font-weight: bold;}
+        button:hover { background: #0099cc; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h1>🛰️ Alerta Starlink</h1>
+    <h2>Isla: <span id="isla-nombre">Cargando...</span></h2>
+
+    <p>🌡️ Clima actual: <span id="clima-desc">...</span></p>
+    <p>🛰️ Satélites en rango: <span id="sat-count">0</span></p>
+
+    <hr style="border-color: #444; margin: 20px 0;">
+
+    <p>Riesgo de corte por clima (Rain Fade):</p>
+    <p id="riesgo" class="risk-LOW">Analizando...</p>
+
+    <button onclick="cargarDatos()">🔄 Actualizar Datos</button>
+</div>
+
+<script>
+    function cargarDatos() {
+        // Llama a tu API de Javalin
+        fetch('/api/rainfade/Las-Palmas')
+            .then(response => response.json())
+            .then(data => {
+                const prediccion = data.predictions[0];
+
+                document.getElementById('isla-nombre').innerText = data.location;
+                document.getElementById('clima-desc').innerText = prediccion.weather.description + " (" + prediccion.weather.temperature + " ºC)";
+                document.getElementById('sat-count').innerText = prediccion.satellitesInView.length;
+
+                // Actualiza el riesgo y el color
+                const divRiesgo = document.getElementById('riesgo');
+                divRiesgo.innerText = prediccion.rainFadeRisk;
+                divRiesgo.className = "risk-" + prediccion.rainFadeRisk;
+            })
+            .catch(error => console.error("Error cargando la API:", error));
+    }
+
+    // Cargar los datos nada más abrir la web
+    cargarDatos();
+</script>
+</body>
+</html>
