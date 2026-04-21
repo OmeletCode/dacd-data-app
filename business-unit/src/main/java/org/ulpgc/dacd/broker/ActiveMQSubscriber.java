@@ -4,14 +4,22 @@ import com.google.gson.Gson;
 import org.apache.activemq.ActiveMQConnectionFactory;
 import org.ulpgc.dacd.model.SatelliteEvent;
 import org.ulpgc.dacd.model.WeatherEvent;
+import org.ulpgc.dacd.repository.MemoryDataMart;
 
 import javax.jms.*;
 
 public class ActiveMQSubscriber {
     private static final String URL = "failover:(tcp://localhost:61616)";
-    // CAMBIO 1: ID Único para este módulo
     private static final String CLIENT_ID = "BusinessUnit-Node1";
     private final Gson gson = new Gson();
+
+    // Nuestro almacén en memoria
+    private final MemoryDataMart dataMart;
+
+    // Se lo pasamos por el constructor
+    public ActiveMQSubscriber(MemoryDataMart dataMart) {
+        this.dataMart = dataMart;
+    }
 
     public void start() {
         try {
@@ -22,7 +30,6 @@ public class ActiveMQSubscriber {
 
             Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
 
-            // Suscribirse a los mismos temas que antes
             Topic spaceXTopic = session.createTopic("sensor.SpaceX");
             MessageConsumer spaceXConsumer = session.createDurableSubscriber(spaceXTopic, "SpaceX-BU-Sub");
 
@@ -35,15 +42,14 @@ public class ActiveMQSubscriber {
                         String json = textMessage.getText();
                         String topicName = message.getJMSDestination().toString().replace("topic://", "");
 
-                        // CAMBIO 2: Aquí es donde ocurre la magia del Analista
                         if (topicName.equals("sensor.SpaceX")) {
                             SatelliteEvent sat = gson.fromJson(json, SatelliteEvent.class);
-                            System.out.println("🛰️ Satélite recibido en tiempo real: " + sat.id());
-                            // TODO: Mandar al Datamart
+                            dataMart.addSatellite(sat); // 💾 Guardado en memoria
+                            System.out.println("🛰️ Satélite guardado en memoria: " + sat.id());
                         } else if (topicName.equals("prediction.Weather")) {
                             WeatherEvent weather = gson.fromJson(json, WeatherEvent.class);
-                            System.out.println("☁️ Clima recibido en tiempo real: " + weather.location());
-                            // TODO: Mandar al Datamart
+                            dataMart.addWeather(weather); // 💾 Guardado en memoria
+                            System.out.println("☁️ Clima guardado en memoria: " + weather.location());
                         }
                     }
                 } catch (JMSException e) {
