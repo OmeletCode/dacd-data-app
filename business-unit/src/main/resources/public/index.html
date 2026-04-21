@@ -2,57 +2,117 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Monitor Predictivo de Rain Fade</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e2f; color: white; text-align: center; padding: 50px; }
-        .card { background-color: #2a2a40; padding: 30px; border-radius: 15px; box-shadow: 0 10px 20px rgba(0,0,0,0.5); display: inline-block; width: 400px; }
-        h1 { color: #00d2ff; }
-        .risk-LOW { color: #00ff88; font-weight: bold; font-size: 24px; }
-        .risk-MEDIUM { color: #ffcc00; font-weight: bold; font-size: 24px; }
-        .risk-HIGH { color: #ff3366; font-weight: bold; font-size: 24px; }
-        button { background: #00d2ff; color: #1e1e2f; border: none; padding: 10px 20px; font-size: 16px; border-radius: 5px; cursor: pointer; margin-top: 20px; font-weight: bold;}
-        button:hover { background: #0099cc; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Satellite Rain Fade Monitor</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css"> <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
 
-<div class="card">
-    <h1>🛰️ Alerta Starlink</h1>
-    <h2>Isla: <span id="isla-nombre">Cargando...</span></h2>
+<div id="map"></div>
 
-    <p>🌡️ Clima actual: <span id="clima-desc">...</span></p>
-    <p>🛰️ Satélites en rango: <span id="sat-count">0</span></p>
+<aside class="dashboard-overlay">
+    <div class="header">
+        <h1>🛰️ STARLINK MONITOR</h1>
+        <p id="update-time">Sincronizando telemetría...</p>
+    </div>
 
-    <hr style="border-color: #444; margin: 20px 0;">
+    <div class="stat-group">
+        <div class="stat-card">
+            <div class="stat-label">Ubicación</div>
+            <div class="stat-value" id="isla-nombre">Cargando...</div>
+        </div>
 
-    <p>Riesgo de corte por clima (Rain Fade):</p>
-    <p id="riesgo" class="risk-LOW">Analizando...</p>
+        <div class="stat-card">
+            <div class="stat-label">Clima Actual</div>
+            <div class="stat-value" id="clima-desc">--</div>
+        </div>
 
-    <button onclick="cargarDatos()">🔄 Actualizar Datos</button>
-</div>
+        <div class="stat-card">
+            <div class="stat-label">Satélites en rango</div>
+            <div class="stat-value"><span id="sat-count">0</span> unidades</div>
+        </div>
+
+        <div class="risk-display" id="risk-box">
+            <div class="stat-label" style="color: inherit">Riesgo Rain Fade</div>
+            <div class="stat-value" id="riesgo" style="font-size: 1.8rem;">---</div>
+        </div>
+    </div>
+
+    <button class="refresh-btn" onclick="actualizarDashboard()">
+        🔄 ACTUALIZAR DATOS
+    </button>
+</aside>
 
 <script>
-    function cargarDatos() {
-        // Llama a tu API de Javalin
+    // Configuración inicial
+    let isFirstLoad = true;
+    let currentMarker;
+    let satelliteMarkers = [];
+    const islandCoords = [28.12, -15.43];
+
+    // 1. Inicialización del Mapa
+    const map = L.map('map', { zoomControl: false }).setView([28.4, -15.8], 8);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    // 2. Función Principal
+    function actualizarDashboard() {
         fetch('/api/rainfade/Las-Palmas')
-            .then(response => response.json())
+            .then(res => res.json())
             .then(data => {
-                const prediccion = data.predictions[0];
+                const p = data.predictions[0];
+                const timestamp = new Date().toLocaleTimeString();
 
+                // Actualizar Textos
+                document.getElementById('update-time').innerText = `Última actualización: ${timestamp}`;
                 document.getElementById('isla-nombre').innerText = data.location;
-                document.getElementById('clima-desc').innerText = prediccion.weather.description + " (" + prediccion.weather.temperature + " ºC)";
-                document.getElementById('sat-count').innerText = prediccion.satellitesInView.length;
+                document.getElementById('clima-desc').innerText = `${p.weather.description} (${p.weather.temperature}ºC)`;
+                document.getElementById('sat-count').innerText = p.satellitesInView.length;
+                document.getElementById('riesgo').innerText = p.rainFadeRisk;
+                document.getElementById('risk-box').className = `risk-display risk-${p.rainFadeRisk}`;
 
-                // Actualiza el riesgo y el color
-                const divRiesgo = document.getElementById('riesgo');
-                divRiesgo.innerText = prediccion.rainFadeRisk;
-                divRiesgo.className = "risk-" + prediccion.rainFadeRisk;
+                // Marcador de la Isla
+                if (currentMarker) map.removeLayer(currentMarker);
+                currentMarker = L.circleMarker(islandCoords, {
+                    radius: 12,
+                    fillColor: getRiskColor(p.rainFadeRisk),
+                    color: "white", weight: 2, fillOpacity: 0.8
+                }).addTo(map);
+                currentMarker.bindPopup(`<b>${data.location}</b><br>Riesgo: ${p.rainFadeRisk}`);
+
+                // 🛰️ Marcadores de Satélites
+                satelliteMarkers.forEach(m => map.removeLayer(m));
+                satelliteMarkers = [];
+                p.satellitesInView.forEach(sat => {
+                    const m = L.circleMarker([sat.lat, sat.lon], {
+                        radius: 6, fillColor: "#00d2ff", color: "#fff", weight: 1, fillOpacity: 0.9
+                    }).addTo(map);
+                    m.bindTooltip(`Sat: ${sat.id}`);
+                    satelliteMarkers.push(m);
+                });
+
+                // Control de Cámara
+                if (isFirstLoad) {
+                    map.flyTo(islandCoords, 9, { duration: 1.5 });
+                    currentMarker.openPopup();
+                    isFirstLoad = false;
+                }
             })
-            .catch(error => console.error("Error cargando la API:", error));
+            .catch(err => console.error("Error API:", err));
     }
 
-    // Cargar los datos nada más abrir la web
-    cargarDatos();
+    function getRiskColor(risk) {
+        const colors = { 'HIGH': '#ff3366', 'MEDIUM': '#ffcc00' };
+        return colors[risk] || '#00ff88';
+    }
+
+    setInterval(actualizarDashboard, 5000);
+    actualizarDashboard();
 </script>
+
 </body>
 </html>

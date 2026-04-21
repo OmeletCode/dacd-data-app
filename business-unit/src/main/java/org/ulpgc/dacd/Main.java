@@ -22,7 +22,6 @@ public class Main {
         String rutaClima = "C:/Users/elyon/Desktop/uni/segundo curso/segundo cuatri/DACD/dacd-data-app/eventstore/prediction.Weather/Weather-Feeder/20260420.events";
         List<WeatherEvent> climaHistorico = reader.readWeatherEvents(rutaClima);
 
-        // Volcamos el archivo a la memoria
         for (WeatherEvent event : climaHistorico) {
             dataMart.addWeather(event);
         }
@@ -33,67 +32,68 @@ public class Main {
         subscriber.start();
 
         // 🚀 4. ABRIMOS LA PUERTA AL FUTURO (Javalin API)
-        // --- LEVANTAR EL SERVIDOR JAVALIN ---
         Javalin app = Javalin.create(config -> {
-            // Le decimos a Javalin que aloje nuestra página web estática
             config.staticFiles.add("/public");
         }).start(8080);
 
-
-        // Tu endpoint para la web
-        // Ruta 2: El Endpoint DEFINITIVO con Lógica de Negocio
+        // Endpoint para el Dashboard Web
         app.get("/api/rainfade/{isla}", ctx -> {
             String location = ctx.pathParam("isla");
-            // Truco: Si la URL tiene "Las-Palmas", lo cambiamos a "Las Palmas" para buscarlo bien
             String locationLimpia = location.replace("-", " ");
 
-            // 1. Buscamos el clima de esa isla en la memoria (cogemos las 3 predicciones más recientes)
+            // 1. Buscamos el clima de esa isla en la memoria
             List<WeatherEvent> climaIsla = dataMart.getWeatherEvents().stream()
                     .filter(w -> w.location().equalsIgnoreCase(locationLimpia))
                     .limit(3)
                     .toList();
 
-            // Si nadie ha pedido datos de esa isla, devolvemos un aviso 404
             if (climaIsla.isEmpty()) {
                 ctx.status(404).result("No hay datos climáticos registrados para: " + locationLimpia);
-                return; // Cortamos la ejecución aquí
+                return;
             }
 
-            // 2. Buscamos los satélites que tenemos en memoria (cogemos 5 nombres sin repetir)
-            List<String> satelitesActivos = dataMart.getSatelliteEvents().stream()
-                    .map(SatelliteEvent::id)
-                    .distinct()
-                    .limit(5)
+            // 2. Buscamos satélites ÚNICOS en memoria
+            List<RainFadeResponse.SatelliteInfo> satelitesActivos = dataMart.getSatelliteEvents().stream()
+                    // Agrupamos por ID y nos quedamos con la última posición conocida de cada uno
+                    .collect(java.util.stream.Collectors.toMap(
+                            SatelliteEvent::id,
+                            s -> s,
+                            (existente, reemplazo) -> reemplazo)
+                    )
+                    .values().stream()
+                    .map(s -> new RainFadeResponse.SatelliteInfo(s.id(), s.lat(), s.lon()))
+                    .limit(10)
                     .toList();
 
-            // 3. Cruzamos los datos y calculamos el riesgo de desconexión
+            // 3. Calculamos riesgo y empaquetamos predicciones
             List<RainFadeResponse.Prediction> predictions = climaIsla.stream().map(clima -> {
 
-                // --- LÓGICA DE NEGOCIO ---
+                // --- Lógica de Riesgo ---
                 String riesgo = "LOW";
-                // Asumimos que tu WeatherEvent tiene description() y clouds() (cámbialos si se llaman distinto)
-                if (clima.description().toLowerCase().contains("rain") /* || clima.clouds() > 80 */) {
+                String desc = clima.description().toLowerCase();
+                if (desc.contains("rain") || desc.contains("drizzle")) {
                     riesgo = "HIGH";
-                } else if (clima.description().toLowerCase().contains("clouds")) {
+                } else if (desc.contains("clouds") || desc.contains("mist")) {
                     riesgo = "MEDIUM";
                 }
 
-                RainFadeResponse.WeatherInfo info = new RainFadeResponse.WeatherInfo(
+                // --- Objeto de Clima ---
+                RainFadeResponse.WeatherInfo infoClima = new RainFadeResponse.WeatherInfo(
                         clima.temperature(),
-                        0, // Ponemos 0 temporalmente si tu WeatherEvent no tiene la humedad guardada
-                        0, // Ponemos 0 temporalmente si no tienes las nubes guardadas
+                        clima.humidity(),
+                        0, // Clouds opcional
                         clima.description()
                 );
 
                 return new RainFadeResponse.Prediction(
-                        "Predicción registrada", // Aquí idealmente iría clima.instant() o la fecha
-                        info,
+                        "Predicción registrada",
+                        infoClima,
                         satelitesActivos,
                         riesgo
                 );
             }).toList();
 
-            // 4. Empaquetamos y enviamos el JSON final
+            // 4. Respuesta Final JSON
             RainFadeResponse response = new RainFadeResponse(
                     locationLimpia,
                     java.time.Instant.now().toString(),
