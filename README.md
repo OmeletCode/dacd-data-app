@@ -1,15 +1,19 @@
-***
-
 # 🚀 DACD Data App - Proyecto Final (Sprint 3)
 
 **Desarrollo de Aplicaciones para Ciencia de Datos - Grado en Ciencia e Ingeniería de Datos (ULPGC)**
-**Desarrollado por:** Pablo Mellado y Yone Suárez
+👨‍💻 **Desarrollado por:** Pablo Mellado y Yone Suárez
 
-Aplicación de extracción, procesamiento y explotación de datos en tiempo real desarrollada en Java 21. Este sistema captura información de múltiples fuentes mediante APIs REST, la distribuye utilizando una Arquitectura Orientada a Eventos (EDA) a través de ActiveMQ, y la consume en una **Business Unit** para ofrecer predicciones a través de una API REST y una interfaz web gráfica (GUI).
+Aplicación de extracción, procesamiento y explotación de datos en tiempo real desarrollada en **Java 21**. Este sistema captura información de múltiples fuentes mediante APIs REST, la distribuye utilizando una Arquitectura Orientada a Eventos (EDA) a través de ActiveMQ, y la consume en una **Business Unit** para ofrecer predicciones a través de una API REST y una interfaz web gráfica (GUI).
+
+---
 
 ## 💡 Propuesta de Valor
 
-El objetivo de este sistema es actuar como un **Monitor Predictivo de Rain Fade (Atenuación por Lluvia)**. El sistema cruza la trayectoria en tiempo real de los satélites de la constelación Starlink (SpaceX) con eventos de clima adverso local (lluvia, densidad de nubes de OpenWeatherMap) para predecir microcortes en la conexión a internet satelital. Esto aporta un valor crítico a nómadas digitales, empresas y trabajadores autónomos en Canarias que dependen de conexiones satelitales estables para operar.
+El objetivo de este sistema es actuar como un **Monitor Predictivo de Rain Fade (Atenuación por Lluvia)**. 
+
+El sistema cruza la trayectoria en tiempo real de los satélites de la constelación Starlink (SpaceX) con eventos de clima adverso local (lluvia, densidad de nubes de OpenWeatherMap) para predecir microcortes en la conexión a internet satelital. Esto aporta un valor crítico a nómadas digitales, empresas y trabajadores autónomos en Canarias que dependen de conexiones satelitales estables para operar.
+
+---
 
 ## 🏗️ Arquitectura del Proyecto y Módulos
 
@@ -27,53 +31,64 @@ El proyecto está diseñado bajo una arquitectura modular y distribuida, dividid
 ### 🗺️ Diagrama de Flujo
 
 ```mermaid
-graph TD
-    %% Feeders (Sprint 1)
-    subgraph SPRINT 1: Extractores
-        WE[Weather Extractor] -->|JSON| B((ActiveMQ Broker))
-        SE[SpaceX Extractor] -->|JSON| B
+graph LR    
+    subgraph S1 [SPRINT 1 - Extractores]
+        WE[Weather Extractor]
+        SE[SpaceX Extractor]
     end
 
-    %% Event Store (Sprint 2)
-    subgraph SPRINT 2: Data Lake
-        B -->|Suscripción Durable| ES[Event Store Builder]
-        ES -->|Guarda .events| HD[(Disco Duro / NDJSON)]
+    subgraph S2 [MIDDLEWARE Y DATA LAKE]
+        B[ActiveMQ Broker]
+        ES[Event Store Builder]
+        HD[Archivos Historicos events]
     end
 
-    %% Business Unit (Sprint 3)
-    subgraph SPRINT 3: Business Unit
-        B -->|Tiempo Real| AS[ActiveMQ Subscriber]
-        HD -->|Histórico| ER[Event Store Reader]
-        
-        AS --> DM[(Memory DataMart)]
-        ER --> DM
-        
-        DM --> API[Javalin REST API]
+    subgraph S3 [SPRINT 3 - BUSINESS UNIT]
+        AS[Suscriptor Tiempo Real]
+        ER[Lector Historico]
+        DM[Datamart en Memoria]
+        API[Javalin REST API]
     end
 
-    %% Frontend
-    API -->|GET /api/rainfade/{isla}| CLI[Dashboard Web / GUI]
-    
-    classDef broker fill:#f9f,stroke:#333,stroke-width:2px;
-    class B broker;
+    CLI[Dashboard Web GUI]
+
+    WE --->|JSON| B
+    SE --->|JSON| B
+
+    B --->|Suscripcion| ES
+    ES --->|Persiste| HD
+
+    B --->|Escucha| AS
+    HD --->|Carga inicial| ER
+
+    AS --> DM
+    ER --> DM
+
+    DM ---> API
+    API --->|GET api/rainfade| CLI
+
 ```
 
 ## 🧩 Patrones de Diseño Aplicados
 
-Para asegurar la escalabilidad, resiliencia y limpieza del código (Clean Code), se han aplicado los siguientes patrones:
+Para asegurar la escalabilidad, resiliencia y limpieza del código (*Clean Code*), se han aplicado los siguientes patrones:
 
-* **Publish/Subscribe (Observer):** Desacoplamiento total entre extractores y consumidores usando ActiveMQ. Los feeders no conocen la existencia de la API.
+* **Publish/Subscribe (Observer):** Desacoplamiento total entre extractores y consumidores usando ActiveMQ. Los *feeders* no conocen la existencia de la API.
 * **MVC Adaptado / Capas:** Separación estricta entre lógica de extracción, almacenamiento y capa de presentación.
 * **Inyección de Dependencias:** El Datamart en memoria se instancia centralmente y se inyecta en los suscriptores y la API.
 * **Tolerancia a Fallos (Resiliencia):** Implementación del protocolo `failover` en las colas de ActiveMQ para permitir reconexiones automáticas si el broker se cae.
 
+---
+
 ## ⚙️ Requisitos y Dependencias
 
-* **Java 21** o superior (`JAVA_HOME` configurado).
+* **Java 21** o superior (Variable `JAVA_HOME` configurada).
 * **Maven** para la gestión de ciclos de vida.
-* **Apache ActiveMQ** (v5.15.x o superior) ejecutándose en local (puerto 61616).
-* Variable de entorno `OPENWEATHER_API_KEY` configurada en el sistema por motivos de seguridad (evitar hardcoding).
-* Dependencias clave: `gson`, `activemq-client`, `javalin`, `okhttp3`.
+* **Apache ActiveMQ** (v5.15.x o superior) ejecutándose en local (puerto `61616`).
+* **API Key de OpenWeatherMap:** Configurada en el sistema operativo como variable de entorno `OPENWEATHER_API_KEY` por motivos de seguridad (evitar *hardcoding*).
+* **Dependencias clave:** `gson`, `activemq-client`, `javalin`, `okhttp3`.
+
+---
 
 ## ▶️ Instrucciones de Ejecución
 
@@ -82,6 +97,6 @@ Debido a la naturaleza distribuida y dirigida por eventos del sistema, el orden 
 1. **Iniciar el Broker:** Ejecuta `activemq start` en la consola de tu instalación de Apache ActiveMQ.
 2. **Compilar el Proyecto:** En la raíz del proyecto, ejecuta `mvn clean install` para construir todos los módulos.
 3. **Levantar el Almacenamiento (Sprint 2):** Ejecuta la clase `Main` del módulo `event-store-builder`.
-4. **Levantar la Business Unit (Sprint 3):** Ejecuta la clase `Main` del módulo `business-unit`. La consola indicará que se han cargado los históricos y que la API REST está funcionando en el puerto 8080.
+4. **Levantar la Business Unit (Sprint 3):** Ejecuta la clase `Main` del módulo `business-unit`. La consola indicará que se han cargado los históricos y que la API REST está funcionando en el puerto `8080`.
 5. **Encender los Sensores (Sprint 1):** Ejecuta las clases `Main` de `spacex-extractor` y `weather-extractor`.
 6. **Visualización en Vivo:** Abre tu navegador web y dirígete a `http://localhost:8080/`. Utiliza el botón de actualización para ver cómo los datos fluyen en tiempo real desde los extractores hasta la interfaz gráfica, modificando los niveles de riesgo de Rain Fade.
