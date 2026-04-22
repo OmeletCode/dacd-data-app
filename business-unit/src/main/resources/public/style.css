@@ -17,13 +17,11 @@ body, html {
     overflow: hidden;
 }
 
-/* Contenedor del Mapa */
 #map {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
     z-index: 1;
 }
 
-/* Panel Lateral (Dashboard) */
 .dashboard-overlay {
     position: absolute;
     top: 20px; left: 20px; bottom: 20px;
@@ -60,7 +58,6 @@ body, html {
     color: var(--text-dim);
 }
 
-/* Tarjetas de Estadísticas */
 .stat-group { flex-grow: 1; overflow-y: auto; }
 
 .stat-card {
@@ -87,7 +84,6 @@ body, html {
 
 .stat-value { font-size: 1.15rem; font-weight: 600; }
 
-/* Display de Riesgo */
 .risk-display {
     text-align: center;
     padding: 24px;
@@ -107,7 +103,6 @@ body, html {
     100% { box-shadow: 0 0 0 0 rgba(255, 51, 102, 0); transform: scale(1); }
 }
 
-/* Botón de Acción */
 .refresh-btn {
     background: var(--accent);
     color: var(--bg-dark);
@@ -128,11 +123,28 @@ body, html {
     box-shadow: 0 10px 20px rgba(0, 210, 255, 0.3);
 }
 
-/* Personalización de Leaflet */
-.leaflet-popup-content-wrapper {
+/* --- ESTILOS DE LOS EMOJIS (NUEVO) --- */
+.sat-marker-container {
+    background: transparent !important;
+    border: none !important;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.sat-emoji {
+    font-size: 20px;
+    /* Un pequeño brillo para que resalte en el mapa oscuro */
+    filter: drop-shadow(0 0 5px rgba(0, 210, 255, 0.5));
+    cursor: pointer;
+}
+
+/* Personalización de Leaflet Popups/Tooltips */
+.leaflet-popup-content-wrapper, .leaflet-tooltip {
     background: var(--bg-dark) !important;
     color: white !important;
-    border-radius: 12px;
+    border-radius: 8px;
     border: 1px solid rgba(255,255,255,0.1);
+    font-family: 'Inter', sans-serif;
 }
 .leaflet-popup-tip { background: var(--bg-dark) !important; }

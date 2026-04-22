@@ -17,27 +17,39 @@ public class SpaceXController {
         GsonEventSerializer jsonSerializer = new GsonEventSerializer();
         ActiveMQMessageSender sender = new ActiveMQMessageSender("sensor.SpaceX");
 
+        // Definimos el intervalo: 60.000 ms = 1 minuto
+        // Esto hará que el mapa se actualice con frecuencia suficiente para la demo
+        long interval = 60000;
+
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                System.out.println("\n[ " + java.time.LocalTime.now() + " ] Iniciando captura de SpaceX...");
-                List<SpaceXEvent> eventos = supplier.getSatellites();
+                System.out.println("\n[ " + java.time.LocalTime.now() + " ] 🛰️ Iniciando captura de SpaceX...");
 
-                if (eventos != null && !eventos.isEmpty()) {
-                    List<String> jsonEvents = new ArrayList<>();
+                try {
+                    List<SpaceXEvent> eventos = supplier.getSatellites();
 
-                    // Convertimos todos los eventos a JSON y los guardamos en la lista
-                    for (SpaceXEvent evento : eventos) {
-                        jsonEvents.add(jsonSerializer.serialize(evento));
+                    if (eventos != null && !eventos.isEmpty()) {
+                        List<String> jsonEvents = new ArrayList<>();
+
+                        // Serialización a JSON
+                        for (SpaceXEvent evento : eventos) {
+                            jsonEvents.add(jsonSerializer.serialize(evento));
+                        }
+
+                        // Envío al Broker ActiveMQ
+                        sender.sendMessages(jsonEvents);
+
+                        System.out.println("✅ ÉXITO: Se han procesado y enviado " + eventos.size() + " satélites.");
+                        System.out.println("⏳ Esperando 60 segundos para el próximo ciclo...");
+
+                    } else {
+                        System.out.println("⚠️ ATENCIÓN: La lista de satélites llegó vacía en este ciclo.");
                     }
-
-                    // Enviamos la lista completa de golpe
-                    sender.sendMessages(jsonEvents);
-
-                } else {
-                    System.out.println("No se pudieron obtener satélites en este ciclo.");
+                } catch (Exception e) {
+                    System.err.println("❌ ERROR en el ciclo de captura: " + e.getMessage());
                 }
             }
-        }, 0, 3600000);
+        }, 0, interval);
     }
 }

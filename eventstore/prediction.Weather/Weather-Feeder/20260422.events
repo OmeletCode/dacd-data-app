@@ -1,2 +1,6 @@
 {"ts":"2026-04-22T20:11:46.442913400Z","ss":"Weather-Feeder","dt":1776888432,"temp":18.87,"humidity":79,"windSpeed":2.22,"description":"overcast clouds","name":"Las Palmas","lat":28.12,"lon":-15.43}
 {"ts":"2026-04-22T20:26:45.568408400Z","ss":"Weather-Feeder","dt":1776889605,"temp":18.77,"humidity":79,"windSpeed":2.22,"description":"overcast clouds","name":"Las Palmas","lat":28.12,"lon":-15.43}
+{"ts":"2026-04-22T21:25:31.833469600Z","ss":"Weather-Feeder","dt":1776893132,"temp":18.77,"humidity":79,"windSpeed":2.15,"description":"overcast clouds","name":"Las Palmas","lat":28.12,"lon":-15.43}
+{"ts":"2026-04-22T21:40:31.572992Z","ss":"Weather-Feeder","dt":1776894031,"temp":18.77,"humidity":79,"windSpeed":2.3,"description":"overcast clouds","name":"Las Palmas","lat":28.12,"lon":-15.43}
+{"ts":"2026-04-22T21:42:36.987608400Z","ss":"Weather-Feeder","dt":1776894031,"temp":18.77,"humidity":79,"windSpeed":2.3,"description":"overcast clouds","name":"Las Palmas","lat":28.12,"lon":-15.43}
+{"ts":"2026-04-22T21:48:08.965080800Z","ss":"Weather-Feeder","dt":1776894031,"temp":18.77,"humidity":79,"windSpeed":2.3,"description":"overcast clouds","name":"Las Palmas","lat":28.12,"lon":-15.43}

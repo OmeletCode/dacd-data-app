@@ -6,7 +6,8 @@
     <title>Satellite Rain Fade Monitor</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="style.css"> <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
 
@@ -46,7 +47,6 @@
 </aside>
 
 <script>
-    // Configuración inicial
     let isFirstLoad = true;
     let currentMarker;
     let satelliteMarkers = [];
@@ -59,6 +59,14 @@
     }).addTo(map);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
+    // 🛰️ Definición del icono de Satélite (Emoji)
+    const satelliteIcon = L.divIcon({
+        html: '<span class="sat-emoji">🛰️</span>',
+        className: 'sat-marker-container',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+    });
+
     // 2. Función Principal
     function actualizarDashboard() {
         fetch('/api/rainfade/Las-Palmas')
@@ -67,7 +75,6 @@
                 const p = data.predictions[0];
                 const timestamp = new Date().toLocaleTimeString();
 
-                // Actualizar Textos
                 document.getElementById('update-time').innerText = `Última actualización: ${timestamp}`;
                 document.getElementById('isla-nombre').innerText = data.location;
                 document.getElementById('clima-desc').innerText = `${p.weather.description} (${p.weather.temperature}ºC)`;
@@ -84,18 +91,24 @@
                 }).addTo(map);
                 currentMarker.bindPopup(`<b>${data.location}</b><br>Riesgo: ${p.rainFadeRisk}`);
 
-                // 🛰️ Marcadores de Satélites
+                // 🛰️ Marcadores de Satélites (Actualizado a Emojis)
                 satelliteMarkers.forEach(m => map.removeLayer(m));
                 satelliteMarkers = [];
+
                 p.satellitesInView.forEach(sat => {
-                    const m = L.circleMarker([sat.lat, sat.lon], {
-                        radius: 6, fillColor: "#00d2ff", color: "#fff", weight: 1, fillOpacity: 0.9
-                    }).addTo(map);
-                    m.bindTooltip(`Sat: ${sat.id}`);
-                    satelliteMarkers.push(m);
+                    // Evitamos pintar satélites sin coordenadas reales (0,0)
+                    if (sat.lat !== 0 || sat.lon !== 0) {
+                        const m = L.marker([sat.lat, sat.lon], { icon: satelliteIcon })
+                            .addTo(map);
+
+                        m.bindTooltip(`Sat: ${sat.id}`, {
+                            direction: 'top',
+                            offset: [0, -10]
+                        });
+                        satelliteMarkers.push(m);
+                    }
                 });
 
-                // Control de Cámara
                 if (isFirstLoad) {
                     map.flyTo(islandCoords, 9, { duration: 1.5 });
                     currentMarker.openPopup();

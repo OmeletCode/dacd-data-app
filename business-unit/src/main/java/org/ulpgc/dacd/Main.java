@@ -19,6 +19,7 @@ public class Main {
 
         // 📚 2. CARGAMOS EL PASADO (Lector Histórico)
         EventStoreReader reader = new EventStoreReader();
+        // Nota: Asegúrate de que esta ruta sea correcta para el día de hoy
         String rutaClima = "C:/Users/elyon/Desktop/uni/segundo curso/segundo cuatri/DACD/dacd-data-app/eventstore/prediction.Weather/Weather-Feeder/20260420.events";
         List<WeatherEvent> climaHistorico = reader.readWeatherEvents(rutaClima);
 
@@ -26,6 +27,11 @@ public class Main {
             dataMart.addWeather(event);
         }
         System.out.println("✅ Histórico cargado en memoria. Total clima: " + dataMart.getWeatherEvents().size());
+
+        dataMart.getWeatherEvents().stream()
+                .map(w -> w.location())
+                .distinct()
+                .forEach(loc -> System.out.println("📍 Localización disponible en memoria: " + loc));
 
         // 📡 3. ESCUCHAMOS EL PRESENTE (ActiveMQ)
         ActiveMQSubscriber subscriber = new ActiveMQSubscriber(dataMart);
@@ -43,7 +49,7 @@ public class Main {
 
             // 1. Buscamos el clima de esa isla en la memoria
             List<WeatherEvent> climaIsla = dataMart.getWeatherEvents().stream()
-                    .filter(w -> w.location().equalsIgnoreCase(locationLimpia))
+                    .filter(w -> w.location().toLowerCase().contains(locationLimpia.toLowerCase()))
                     .limit(3)
                     .toList();
 
@@ -62,7 +68,8 @@ public class Main {
                     )
                     .values().stream()
                     .map(s -> new RainFadeResponse.SatelliteInfo(s.id(), s.lat(), s.lon()))
-                    .limit(10)
+                    // 👇 CAMBIO: Subimos el límite para ver una constelación real
+                    .limit(200)
                     .toList();
 
             // 3. Calculamos riesgo y empaquetamos predicciones
