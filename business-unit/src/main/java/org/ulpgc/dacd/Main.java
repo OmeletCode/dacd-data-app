@@ -29,7 +29,7 @@ public class Main {
         System.out.println("✅ Histórico cargado en memoria. Total clima: " + dataMart.getWeatherEvents().size());
 
         dataMart.getWeatherEvents().stream()
-                .map(w -> w.location())
+                .map(w -> w.name())
                 .distinct()
                 .forEach(loc -> System.out.println("📍 Localización disponible en memoria: " + loc));
 
@@ -49,7 +49,7 @@ public class Main {
 
             // 1. Buscamos el clima de esa isla en la memoria
             List<WeatherEvent> climaIsla = dataMart.getWeatherEvents().stream()
-                    .filter(w -> w.location().toLowerCase().contains(locationLimpia.toLowerCase()))
+                    .filter(w -> w.name().toLowerCase().contains(locationLimpia.toLowerCase()))
                     .limit(3)
                     .toList();
 
@@ -97,7 +97,7 @@ public class Main {
 
                 // --- Objeto de Clima ---
                 RainFadeResponse.WeatherInfo infoClima = new RainFadeResponse.WeatherInfo(
-                        clima.temperature(),
+                        clima.temp(),
                         clima.humidity(),
                         0, // Clouds opcional
                         clima.description()
