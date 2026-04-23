@@ -15,14 +15,17 @@
 
 <aside class="dashboard-overlay">
     <div class="header">
+        <div class="live-status">
+            <span class="dot"></span> LIVE TELEMETRY
+        </div>
         <h1>🛰️ STARLINK MONITOR</h1>
-        <p id="update-time">Sincronizando telemetría...</p>
+        <p id="update-time">Sincronizando...</p>
     </div>
 
     <div class="stat-group">
         <div class="stat-card">
             <div class="stat-label">Ubicación</div>
-            <div class="stat-value" id="isla-nombre">Cargando...</div>
+            <div class="stat-value" id="isla-nombre">--</div>
         </div>
 
         <div class="stat-card">
@@ -50,6 +53,7 @@
     let isFirstLoad = true;
     let currentMarker;
     let satelliteMarkers = [];
+    let connectionLines = [];
     const islandCoords = [28.12, -15.43];
 
     // 1. Inicialización del Mapa
@@ -59,7 +63,6 @@
     }).addTo(map);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // 🛰️ Definición del icono de Satélite (Emoji)
     const satelliteIcon = L.divIcon({
         html: '<span class="sat-emoji">🛰️</span>',
         className: 'sat-marker-container',
@@ -67,60 +70,81 @@
         iconAnchor: [12, 12]
     });
 
-    // 2. Función Principal
     function actualizarDashboard() {
         fetch('/api/rainfade/Las-Palmas')
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) throw new Error("Servidor no disponible");
+                return res.json();
+            })
             .then(data => {
                 const p = data.predictions[0];
                 const timestamp = new Date().toLocaleTimeString();
 
-                document.getElementById('update-time').innerText = `Última actualización: ${timestamp}`;
+                // Normalizamos el riesgo para evitar errores de mayúsculas/minúsculas
+                const riesgoNormalizado = p.rainFadeRisk.toUpperCase().trim();
+
+                document.getElementById('update-time').innerText = `Actualizado: ${timestamp}`;
+                document.getElementById('update-time').style.color = "rgba(255,255,255,0.6)";
                 document.getElementById('isla-nombre').innerText = data.location;
-                document.getElementById('clima-desc').innerText = `${p.weather.description} (${p.weather.temperature}ºC)`;
+
+                document.getElementById('clima-desc').innerText = `${p.weather.description} (${p.weather.temperature.toFixed(1)}ºC)`;
                 document.getElementById('sat-count').innerText = p.satellitesInView.length;
-                document.getElementById('riesgo').innerText = p.rainFadeRisk;
-                document.getElementById('risk-box').className = `risk-display risk-${p.rainFadeRisk}`;
+                document.getElementById('riesgo').innerText = riesgoNormalizado;
+                document.getElementById('risk-box').className = `risk-display risk-${riesgoNormalizado}`;
 
                 // Marcador de la Isla
                 if (currentMarker) map.removeLayer(currentMarker);
                 currentMarker = L.circleMarker(islandCoords, {
                     radius: 12,
-                    fillColor: getRiskColor(p.rainFadeRisk),
+                    fillColor: getRiskColor(riesgoNormalizado),
                     color: "white", weight: 2, fillOpacity: 0.8
                 }).addTo(map);
-                currentMarker.bindPopup(`<b>${data.location}</b><br>Riesgo: ${p.rainFadeRisk}`);
+                currentMarker.bindPopup(`<b>${data.location}</b><br>Riesgo: ${riesgoNormalizado}`);
 
-                // 🛰️ Marcadores de Satélites (Actualizado a Emojis)
+                // Limpiar satélites y líneas anteriores
                 satelliteMarkers.forEach(m => map.removeLayer(m));
+                connectionLines.forEach(l => map.removeLayer(l));
                 satelliteMarkers = [];
+                connectionLines = [];
 
                 p.satellitesInView.forEach(sat => {
-                    // Evitamos pintar satélites sin coordenadas reales (0,0)
                     if (sat.lat !== 0 || sat.lon !== 0) {
-                        const m = L.marker([sat.lat, sat.lon], { icon: satelliteIcon })
-                            .addTo(map);
-
-                        m.bindTooltip(`Sat: ${sat.id}`, {
-                            direction: 'top',
-                            offset: [0, -10]
-                        });
+                        // Crear Marcador
+                        const m = L.marker([sat.lat, sat.lon], { icon: satelliteIcon }).addTo(map);
+                        m.bindTooltip(`ID: ${sat.id}`, { direction: 'top', offset: [0, -10] });
                         satelliteMarkers.push(m);
+
+                        // --- CORRECCIÓN AQUÍ ---
+                        // Solo dibujamos la línea si el riesgo es MEDIUM o HIGH
+                        if (riesgoNormalizado === 'MEDIUM' || riesgoNormalizado === 'HIGH') {
+                            const line = L.polyline([islandCoords, [sat.lat, sat.lon]], {
+                                color: getRiskColor(riesgoNormalizado),
+                                weight: 1.5,
+                                opacity: 0.5,
+                                dashArray: '5, 10'
+                            }).addTo(map);
+                            connectionLines.push(line);
+                        }
                     }
                 });
 
                 if (isFirstLoad) {
                     map.flyTo(islandCoords, 9, { duration: 1.5 });
-                    currentMarker.openPopup();
                     isFirstLoad = false;
                 }
             })
-            .catch(err => console.error("Error API:", err));
+            .catch(err => {
+                console.error("Error API:", err);
+                document.getElementById('update-time').innerText = "⚠️ ERROR DE CONEXIÓN";
+                document.getElementById('update-time').style.color = "#ff3366";
+            });
     }
 
     function getRiskColor(risk) {
-        const colors = { 'HIGH': '#ff3366', 'MEDIUM': '#ffcc00' };
-        return colors[risk] || '#00ff88';
+        // Aseguramos que la función también reciba el riesgo normalizado
+        const r = risk.toUpperCase().trim();
+        const colors = { 'HIGH': '#ff3366', 'MEDIUM': '#ffcc00', 'LOW': '#00ff88' };
+        return colors[r] || '#00ff88';
     }
 
     setInterval(actualizarDashboard, 5000);

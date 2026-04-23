@@ -44,9 +44,36 @@ body, html {
     margin-bottom: 20px;
 }
 
+/* Indicador LIVE */
+.live-status {
+    font-size: 0.65rem;
+    font-weight: 900;
+    letter-spacing: 2px;
+    color: var(--low);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.dot {
+    height: 8px;
+    width: 8px;
+    background-color: var(--low);
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--low);
+    animation: blink 1.5s infinite;
+}
+
+@keyframes blink {
+    0% { opacity: 1; }
+    50% { opacity: 0.3; }
+    100% { opacity: 1; }
+}
+
 .header h1 {
     margin: 0;
-    font-size: 1.5rem;
+    font-size: 1.4rem;
     color: var(--accent);
     letter-spacing: 1px;
     font-weight: 800;
@@ -123,7 +150,6 @@ body, html {
     box-shadow: 0 10px 20px rgba(0, 210, 255, 0.3);
 }
 
-/* --- ESTILOS DE LOS EMOJIS (NUEVO) --- */
 .sat-marker-container {
     background: transparent !important;
     border: none !important;
@@ -134,12 +160,10 @@ body, html {
 
 .sat-emoji {
     font-size: 20px;
-    /* Un pequeño brillo para que resalte en el mapa oscuro */
     filter: drop-shadow(0 0 5px rgba(0, 210, 255, 0.5));
     cursor: pointer;
 }
 
-/* Personalización de Leaflet Popups/Tooltips */
 .leaflet-popup-content-wrapper, .leaflet-tooltip {
     background: var(--bg-dark) !important;
     color: white !important;
