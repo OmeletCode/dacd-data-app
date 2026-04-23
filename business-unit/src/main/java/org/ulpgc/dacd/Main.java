@@ -60,7 +60,6 @@ public class Main {
 
             // 2. Buscamos satélites ÚNICOS en memoria
             List<RainFadeResponse.SatelliteInfo> satelitesActivos = dataMart.getSatelliteEvents().stream()
-                    // Agrupamos por ID y nos quedamos con la última posición conocida de cada uno
                     .collect(java.util.stream.Collectors.toMap(
                             SatelliteEvent::id,
                             s -> s,
@@ -68,19 +67,31 @@ public class Main {
                     )
                     .values().stream()
                     .map(s -> new RainFadeResponse.SatelliteInfo(s.id(), s.lat(), s.lon()))
-                    // 👇 CAMBIO: Subimos el límite para ver una constelación real
                     .limit(200)
                     .toList();
 
             // 3. Calculamos riesgo y empaquetamos predicciones
             List<RainFadeResponse.Prediction> predictions = climaIsla.stream().map(clima -> {
 
-                // --- Lógica de Riesgo ---
+                // --- Lógica de Riesgo (Modelo Físico ITU-R para Banda Ku de Starlink) ---
+                double rainRate = estimarLluvia(clima.description());
+
+                // Constantes aproximadas de atenuación para ~12 GHz (Descarga Starlink)
+                double a = 0.0188;
+                double b = 1.15;
+
+                // Cálculo: A = a * R^b
+                double atenuacionDB = a * Math.pow(rainRate, b);
+
                 String riesgo = "LOW";
-                String desc = clima.description().toLowerCase();
-                if (desc.contains("rain") || desc.contains("drizzle")) {
+                if (atenuacionDB > 3.0) {
+                    // Si perdemos más de 3 decibelios, la señal cae drásticamente
                     riesgo = "HIGH";
-                } else if (desc.contains("clouds") || desc.contains("mist")) {
+                } else if (atenuacionDB > 0.5) {
+                    // Si perdemos algo de señal pero es manejable
+                    riesgo = "MEDIUM";
+                } else if (clima.description().toLowerCase().contains("clouds")) {
+                    // Nubes densas sin lluvia fuerte = riesgo medio preventivo
                     riesgo = "MEDIUM";
                 }
 
@@ -109,5 +120,20 @@ public class Main {
 
             ctx.json(response);
         });
+    }
+
+    // Función para estimar la tasa de lluvia (R) en mm/h según el texto
+    private static double estimarLluvia(String descripcion) {
+        if (descripcion == null) return 0.0;
+        String desc = descripcion.toLowerCase();
+
+        if (desc.contains("heavy") || desc.contains("extreme") || desc.contains("thunderstorm")) {
+            return 25.0; // Lluvia fuerte (mm/h)
+        } else if (desc.contains("moderate") || desc.equals("rain")) {
+            return 10.0; // Lluvia moderada
+        } else if (desc.contains("light") || desc.contains("drizzle")) {
+            return 2.5;  // Llovizna
+        }
+        return 0.0; // Despejado o nublado sin precipitación
     }
 }
