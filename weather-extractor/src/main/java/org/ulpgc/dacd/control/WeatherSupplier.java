@@ -7,6 +7,8 @@ import okhttp3.Request;
 import okhttp3.Response;
 import java.io.IOException;
 import java.time.Instant; // --- NUEVO: Importante para el Timestamp ---
+import org.ulpgc.dacd.model.WeatherEvent;
+
 
 public class WeatherSupplier {
     private String apiKey;

@@ -6,6 +6,8 @@ import okhttp3.Response;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import org.ulpgc.dacd.model.SatelliteEvent;
+
 import java.io.IOException;
 import java.time.Instant; // --- NUEVO: Importante para el Timestamp ---
 import java.util.ArrayList;
@@ -16,8 +18,8 @@ public class RestSpaceXSupplier implements SpaceXSupplier {
     private final String url = "https://api.spacexdata.com/v4/starlink";
 
     @Override
-    public List<SpaceXEvent> getSatellites() {
-        List<SpaceXEvent> eventos = new ArrayList<>();
+    public List<SatelliteEvent> getSatellites() {
+        List<SatelliteEvent> eventos = new ArrayList<>();
         Request request = new Request.Builder().url(url).build();
 
         try (Response response = client.newCall(request).execute()) {
@@ -43,7 +45,7 @@ public class RestSpaceXSupplier implements SpaceXSupplier {
                     String ts = Instant.now().toString(); // Timestamp en formato UTC
                     String ss = "SpaceX-Feeder";          // El origen del dato
 
-                    SpaceXEvent evento = new SpaceXEvent(ts, ss, name, lat, lon);
+                    SatelliteEvent evento = new SatelliteEvent(ts, ss, name, lat, lon);
 
                     eventos.add(evento);
                 }

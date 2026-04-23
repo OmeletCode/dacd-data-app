@@ -46,6 +46,12 @@
             <version>5.15.12</version>
         </dependency>
 
+        <dependency>
+        <groupId>org.ulpgc.dacd</groupId>
+        <artifactId>common</artifactId>
+        <version>${project.version}</version>
+        </dependency>
+
     </dependencies>
 
 </project>

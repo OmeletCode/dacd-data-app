@@ -2,6 +2,9 @@ package org.ulpgc.dacd.control;
 
 import java.util.Timer;
 import java.util.TimerTask;
+import org.ulpgc.dacd.model.WeatherEvent;
+import org.ulpgc.dacd.model.ActiveMQMessageSender;
+import org.ulpgc.dacd.model.GsonEventSerializer;
 
 public class WeatherController {
     private final WeatherSupplier supplier;
@@ -29,7 +32,7 @@ public class WeatherController {
                         String json = jsonSerializer.serialize(weatherEvent);
 
                         // 2. Lo enviamos por internet al Broker (Punto 7)
-                        sender.sendMessage(json);
+                        sender.sendMessages(java.util.List.of(json));
                     }
                 } catch (Exception e) {
                     System.err.println("Error al capturar el clima: " + e.getMessage());

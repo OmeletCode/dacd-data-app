@@ -1,5 +1,9 @@
 package org.ulpgc.dacd;
 
+import org.ulpgc.dacd.model.ActiveMQMessageSender;
+import org.ulpgc.dacd.model.GsonEventSerializer;
+import org.ulpgc.dacd.model.SatelliteEvent;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
@@ -27,13 +31,13 @@ public class SpaceXController {
                 System.out.println("\n[ " + java.time.LocalTime.now() + " ] 🛰️ Iniciando captura de SpaceX...");
 
                 try {
-                    List<SpaceXEvent> eventos = supplier.getSatellites();
+                    List<SatelliteEvent> eventos = supplier.getSatellites();
 
                     if (eventos != null && !eventos.isEmpty()) {
                         List<String> jsonEvents = new ArrayList<>();
 
                         // Serialización a JSON
-                        for (SpaceXEvent evento : eventos) {
+                        for (SatelliteEvent evento : eventos) {
                             jsonEvents.add(jsonSerializer.serialize(evento));
                         }
 

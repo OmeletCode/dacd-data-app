@@ -15,6 +15,7 @@
         <module>weather-extractor</module>
         <module>event-store-builder</module>
         <module>business-unit</module>
+        <module>common</module>
     </modules>
 
     <properties>

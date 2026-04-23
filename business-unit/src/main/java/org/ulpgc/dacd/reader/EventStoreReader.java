@@ -1,9 +1,9 @@
 package org.ulpgc.dacd.reader;
 
 import com.google.gson.Gson;
-import org.ulpgc.dacd.model.SatelliteEvent;
-import org.ulpgc.dacd.model.WeatherEvent;
 
+import org.ulpgc.dacd.model.WeatherEvent;
+import org.ulpgc.dacd.model.SatelliteEvent;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;

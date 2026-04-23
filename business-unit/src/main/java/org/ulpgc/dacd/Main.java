@@ -3,11 +3,11 @@ package org.ulpgc.dacd;
 import io.javalin.Javalin;
 import org.ulpgc.dacd.broker.ActiveMQSubscriber;
 import org.ulpgc.dacd.model.RainFadeResponse;
-import org.ulpgc.dacd.model.SatelliteEvent;
-import org.ulpgc.dacd.model.WeatherEvent;
 import org.ulpgc.dacd.reader.EventStoreReader;
 import org.ulpgc.dacd.repository.MemoryDataMart;
 
+import org.ulpgc.dacd.model.WeatherEvent;
+import org.ulpgc.dacd.model.SatelliteEvent;
 import java.util.List;
 
 public class Main {

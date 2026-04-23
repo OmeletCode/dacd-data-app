@@ -1,4 +1,4 @@
-package org.ulpgc.dacd;
+package org.ulpgc.dacd.model;
 
 import org.apache.activemq.ActiveMQConnectionFactory;
 import javax.jms.*;

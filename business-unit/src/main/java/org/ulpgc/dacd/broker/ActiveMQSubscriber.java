@@ -1,10 +1,11 @@
 package org.ulpgc.dacd.broker;
 
+import org.ulpgc.dacd.model.WeatherEvent;
+import org.ulpgc.dacd.model.SatelliteEvent;
 import com.google.gson.Gson;
 import org.apache.activemq.ActiveMQConnectionFactory;
-import org.ulpgc.dacd.model.SatelliteEvent;
-import org.ulpgc.dacd.model.WeatherEvent;
 import org.ulpgc.dacd.repository.MemoryDataMart;
+
 
 import javax.jms.*;
 
@@ -49,7 +50,7 @@ public class ActiveMQSubscriber {
                         } else if (topicName.equals("prediction.Weather")) {
                             WeatherEvent weather = gson.fromJson(json, WeatherEvent.class);
                             dataMart.addWeather(weather); // 💾 Guardado en memoria
-                            System.out.println("☁️ Clima guardado en memoria: " + weather.location());
+                            System.out.println("☁️ Clima guardado en memoria: " + weather.name());
                         }
                     }
                 } catch (JMSException e) {
