@@ -4,56 +4,57 @@ import org.ulpgc.dacd.model.ActiveMQMessageSender;
 import org.ulpgc.dacd.model.GsonEventSerializer;
 import org.ulpgc.dacd.model.SatelliteEvent;
 
-import java.util.ArrayList;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
 public class SpaceXController {
+    private static final long EXECUTION_INTERVAL_MS = 60000;
+    private static final String SPACEX_TOPIC = "sensor.SpaceX";
+
     private final SpaceXSupplier supplier;
+    private final GsonEventSerializer jsonSerializer;
+    private final ActiveMQMessageSender sender;
 
     public SpaceXController(SpaceXSupplier supplier) {
         this.supplier = supplier;
+        this.jsonSerializer = new GsonEventSerializer();
+        this.sender = new ActiveMQMessageSender(SPACEX_TOPIC);
     }
 
     public void execute() {
         Timer timer = new Timer();
-        GsonEventSerializer jsonSerializer = new GsonEventSerializer();
-        ActiveMQMessageSender sender = new ActiveMQMessageSender("sensor.SpaceX");
-
-        // Definimos el intervalo: 60.000 ms = 1 minuto
-        // Esto hará que el mapa se actualice con frecuencia suficiente para la demo
-        long interval = 60000;
-
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                System.out.println("\n[ " + java.time.LocalTime.now() + " ] 🛰️ Iniciando captura de SpaceX...");
-
-                try {
-                    List<SatelliteEvent> eventos = supplier.getSatellites();
-
-                    if (eventos != null && !eventos.isEmpty()) {
-                        List<String> jsonEvents = new ArrayList<>();
-
-                        // Serialización a JSON
-                        for (SatelliteEvent evento : eventos) {
-                            jsonEvents.add(jsonSerializer.serialize(evento));
-                        }
-
-                        // Envío al Broker ActiveMQ
-                        sender.sendMessages(jsonEvents);
-
-                        System.out.println("✅ ÉXITO: Se han procesado y enviado " + eventos.size() + " satélites.");
-                        System.out.println("⏳ Esperando 60 segundos para el próximo ciclo...");
-
-                    } else {
-                        System.out.println("⚠️ ATENCIÓN: La lista de satélites llegó vacía en este ciclo.");
-                    }
-                } catch (Exception e) {
-                    System.err.println("❌ ERROR en el ciclo de captura: " + e.getMessage());
-                }
+                performExtractionCycle();
             }
-        }, 0, interval);
+        }, 0, EXECUTION_INTERVAL_MS);
+    }
+
+    private void performExtractionCycle() {
+        System.out.println("\n[ " + LocalTime.now() + " ] 🛰️ Iniciando captura de SpaceX...");
+
+        try {
+            List<SatelliteEvent> events = supplier.getSatellites();
+
+            if (events == null || events.isEmpty()) {
+                System.out.println("⚠️ ATENCIÓN: La lista de satélites llegó vacía en este ciclo.");
+                return;
+            }
+
+            List<String> jsonEvents = events.stream()
+                    .map(jsonSerializer::serialize)
+                    .toList();
+
+            sender.sendMessages(jsonEvents);
+
+            System.out.println("✅ ÉXITO: Se han procesado y enviado " + events.size() + " satélites.");
+            System.out.println("⏳ Esperando " + (EXECUTION_INTERVAL_MS / 1000) + " segundos para el próximo ciclo...");
+
+        } catch (Exception e) {
+            System.err.println("❌ ERROR en el ciclo de captura: " + e.getMessage());
+        }
     }
 }

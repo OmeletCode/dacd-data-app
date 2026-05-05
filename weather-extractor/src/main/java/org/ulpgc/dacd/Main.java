@@ -4,25 +4,28 @@ import org.ulpgc.dacd.control.WeatherController;
 import org.ulpgc.dacd.control.WeatherSupplier;
 
 public class Main {
+    private static final String API_KEY_ENV_VAR = "OPENWEATHER_API_KEY";
+
     public static void main(String[] args) {
-        // 1. Leemos la clave de forma segura desde las variables de entorno
-        String key = System.getenv("OPENWEATHER_API_KEY");
+        System.out.println("--- Iniciando el Extractor Meteorológico ---");
 
-        // Comprobación de seguridad por si se nos olvida configurarla
-        if (key == null || key.isEmpty()) {
-            System.err.println("ERROR: No se ha encontrado la API Key.");
-            System.err.println("Por favor, configura la variable de entorno 'OPENWEATHER_API_KEY' en tu sistema o IDE.");
-            return; // Detenemos la ejecución para no hacer peticiones inválidas
-        }
+        String apiKey = getApiKeyOrExit();
 
-        // 2. Instanciamos el extractor de la API con la clave segura
-        WeatherSupplier supplier = new WeatherSupplier(key);
-
-        // 3. Ensamblamos el controlador pasándole el supplier
+        WeatherSupplier supplier = new WeatherSupplier(apiKey);
         WeatherController controller = new WeatherController(supplier);
 
-        // 4. ¡Arrancamos el motor!
-        System.out.println("--- Iniciando recolector de clima (Seguro y JSON Ready) ---");
         controller.execute();
+    }
+
+    private static String getApiKeyOrExit() {
+        String key = System.getenv(API_KEY_ENV_VAR);
+
+        if (key == null || key.isBlank()) {
+            System.err.println("❌ ERROR: Variable de entorno '" + API_KEY_ENV_VAR + "' no configurada.");
+            System.err.println("Por favor, configúrala en tu sistema o IDE antes de arrancar el recolector.");
+            System.exit(1); // Código 1 indica salida por error
+        }
+
+        return key;
     }
 }

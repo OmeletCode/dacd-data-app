@@ -9,50 +9,72 @@ import com.google.gson.JsonParser;
 import org.ulpgc.dacd.model.SatelliteEvent;
 
 import java.io.IOException;
-import java.time.Instant; // --- NUEVO: Importante para el Timestamp ---
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class RestSpaceXSupplier implements SpaceXSupplier {
-    private final OkHttpClient client = new OkHttpClient();
-    private final String url = "https://api.spacexdata.com/v4/starlink";
+    private static final String API_URL = "https://api.spacexdata.com/v4/starlink";
+    private static final String SOURCE_SYSTEM = "SpaceX-Feeder";
+    private static final String DEFAULT_NAME = "Desconocido";
+
+    private final OkHttpClient client;
+
+    public RestSpaceXSupplier() {
+        this.client = new OkHttpClient();
+    }
 
     @Override
     public List<SatelliteEvent> getSatellites() {
-        List<SatelliteEvent> eventos = new ArrayList<>();
-        Request request = new Request.Builder().url(url).build();
+        Request request = new Request.Builder().url(API_URL).build();
 
         try (Response response = client.newCall(request).execute()) {
             if (response.isSuccessful() && response.body() != null) {
-                String rawJson = response.body().string();
-                JsonArray starlinks = JsonParser.parseString(rawJson).getAsJsonArray();
-
-                for (int i = 0; i < starlinks.size(); i++) {
-                    JsonObject obj = starlinks.get(i).getAsJsonObject();
-
-                    String name = "Desconocido";
-                    if (obj.has("spaceTrack") && !obj.get("spaceTrack").isJsonNull()) {
-                        name = obj.get("spaceTrack").getAsJsonObject().get("OBJECT_NAME").getAsString();
-                    } else if (obj.has("id")) {
-                        name = obj.get("id").getAsString();
-                    }
-
-                    double lat = obj.has("latitude") && !obj.get("latitude").isJsonNull() ? obj.get("latitude").getAsDouble() : 0.0;
-                    double lon = obj.has("longitude") && !obj.get("longitude").isJsonNull() ? obj.get("longitude").getAsDouble() : 0.0;
-                    //double vel = obj.has("velocity_kms") && !obj.get("velocity_kms").isJsonNull() ? obj.get("velocity_kms").getAsDouble() : 0.0;
-
-
-                    String ts = Instant.now().toString(); // Timestamp en formato UTC
-                    String ss = "SpaceX-Feeder";          // El origen del dato
-
-                    SatelliteEvent evento = new SatelliteEvent(ts, ss, name, lat, lon);
-
-                    eventos.add(evento);
-                }
+                return parseSatellites(response.body().string());
             }
         } catch (IOException e) {
             System.err.println("Error obteniendo datos de SpaceX: " + e.getMessage());
         }
-        return eventos;
+
+        return Collections.emptyList();
+    }
+
+    private List<SatelliteEvent> parseSatellites(String jsonBody) {
+        List<SatelliteEvent> events = new ArrayList<>();
+        JsonArray starlinks = JsonParser.parseString(jsonBody).getAsJsonArray();
+        String currentTimestamp = Instant.now().toString();
+
+        for (int i = 0; i < starlinks.size(); i++) {
+            JsonObject obj = starlinks.get(i).getAsJsonObject();
+            events.add(buildSatelliteEvent(obj, currentTimestamp));
+        }
+
+        return events;
+    }
+
+    private SatelliteEvent buildSatelliteEvent(JsonObject obj, String timestamp) {
+        String name = extractName(obj);
+        double latitude = extractCoordinate(obj, "latitude");
+        double longitude = extractCoordinate(obj, "longitude");
+
+        return new SatelliteEvent(timestamp, SOURCE_SYSTEM, name, latitude, longitude);
+    }
+
+    private String extractName(JsonObject obj) {
+        if (obj.has("spaceTrack") && !obj.get("spaceTrack").isJsonNull()) {
+            return obj.get("spaceTrack").getAsJsonObject().get("OBJECT_NAME").getAsString();
+        }
+        if (obj.has("id") && !obj.get("id").isJsonNull()) {
+            return obj.get("id").getAsString();
+        }
+        return DEFAULT_NAME;
+    }
+
+    private double extractCoordinate(JsonObject obj, String key) {
+        if (obj.has(key) && !obj.get(key).isJsonNull()) {
+            return obj.get(key).getAsDouble();
+        }
+        return 0.0;
     }
 }

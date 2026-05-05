@@ -7,13 +7,12 @@ public record RainFadeResponse(
         String requestTime,
         List<Prediction> predictions
 ) {
-    // 🛰️ NUEVO: Record para enviar la posición del satélite
     public record SatelliteInfo(String id, double lat, double lon) {}
 
     public record Prediction(
             String time,
             WeatherInfo weather,
-            List<SatelliteInfo> satellitesInView, // 👈 Cambiado de List<String> a List<SatelliteInfo>
+            List<SatelliteInfo> satellitesInView,
             String rainFadeRisk
     ) {}
 

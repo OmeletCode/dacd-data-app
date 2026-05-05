@@ -3,13 +3,13 @@ package org.ulpgc.dacd.model;
 import com.google.gson.Gson;
 
 public class GsonEventSerializer {
-    private final Gson gson;
+
+    private static final Gson GSON = new Gson();
 
     public GsonEventSerializer() {
-        this.gson = new Gson();
     }
 
-    public String serialize(Object event) {
-        return gson.toJson(event);
+    public <T> String serialize(T event) {
+        return GSON.toJson(event);
     }
 }

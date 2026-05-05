@@ -6,65 +6,85 @@ import com.google.gson.Gson;
 import org.apache.activemq.ActiveMQConnectionFactory;
 import org.ulpgc.dacd.repository.MemoryDataMart;
 
-
 import javax.jms.*;
 
 public class ActiveMQSubscriber {
     private static final String URL = "failover:(tcp://localhost:61616)";
     private static final String CLIENT_ID = "BusinessUnit-Node1";
-    private final Gson gson = new Gson();
+    private static final String SPACEX_TOPIC = "sensor.SpaceX";
+    private static final String WEATHER_TOPIC = "prediction.Weather";
 
-    // Nuestro almacén en memoria
+    private final Gson gson = new Gson();
     private final MemoryDataMart dataMart;
 
-    // Se lo pasamos por el constructor
     public ActiveMQSubscriber(MemoryDataMart dataMart) {
         this.dataMart = dataMart;
     }
 
     public void start() {
         try {
-            ConnectionFactory connectionFactory = new ActiveMQConnectionFactory(URL);
-            Connection connection = connectionFactory.createConnection();
-            connection.setClientID(CLIENT_ID);
-            connection.start();
-
+            Connection connection = createConnection();
             Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
 
-            Topic spaceXTopic = session.createTopic("sensor.SpaceX");
-            MessageConsumer spaceXConsumer = session.createDurableSubscriber(spaceXTopic, "SpaceX-BU-Sub");
-
-            Topic weatherTopic = session.createTopic("prediction.Weather");
-            MessageConsumer weatherConsumer = session.createDurableSubscriber(weatherTopic, "Weather-BU-Sub");
-
-            MessageListener listener = message -> {
-                try {
-                    if (message instanceof TextMessage textMessage) {
-                        String json = textMessage.getText();
-                        String topicName = message.getJMSDestination().toString().replace("topic://", "");
-
-                        if (topicName.equals("sensor.SpaceX")) {
-                            SatelliteEvent sat = gson.fromJson(json, SatelliteEvent.class);
-                            dataMart.addSatellite(sat); // 💾 Guardado en memoria
-                            System.out.println("🛰️ Satélite guardado en memoria: " + sat.id());
-                        } else if (topicName.equals("prediction.Weather")) {
-                            WeatherEvent weather = gson.fromJson(json, WeatherEvent.class);
-                            dataMart.addWeather(weather); // 💾 Guardado en memoria
-                            System.out.println("☁️ Clima guardado en memoria: " + weather.name());
-                        }
-                    }
-                } catch (JMSException e) {
-                    System.err.println("Error procesando mensaje: " + e.getMessage());
-                }
-            };
-
-            spaceXConsumer.setMessageListener(listener);
-            weatherConsumer.setMessageListener(listener);
+            setupSubscriber(session, SPACEX_TOPIC, "SpaceX-BU-Sub");
+            setupSubscriber(session, WEATHER_TOPIC, "Weather-BU-Sub");
 
             System.out.println("📡 Business Unit escuchando ActiveMQ en tiempo real...");
 
         } catch (JMSException e) {
             System.err.println("Error en la conexión ActiveMQ: " + e.getMessage());
         }
+    }
+
+    private Connection createConnection() throws JMSException {
+        ConnectionFactory connectionFactory = new ActiveMQConnectionFactory(URL);
+        Connection connection = connectionFactory.createConnection();
+        connection.setClientID(CLIENT_ID);
+        connection.start();
+        return connection;
+    }
+
+    private void setupSubscriber(Session session, String topicName, String subscriberName) throws JMSException {
+        Topic topic = session.createTopic(topicName);
+        MessageConsumer consumer = session.createDurableSubscriber(topic, subscriberName);
+        consumer.setMessageListener(this::processMessage);
+    }
+
+    private void processMessage(Message message) {
+        try {
+            if (!(message instanceof TextMessage textMessage)) return;
+
+            String json = textMessage.getText();
+            String topicName = extractTopicName(message);
+
+            routeMessageToDataMart(topicName, json);
+
+        } catch (JMSException e) {
+            System.err.println("Error procesando mensaje: " + e.getMessage());
+        }
+    }
+
+    private String extractTopicName(Message message) throws JMSException {
+        return message.getJMSDestination().toString().replace("topic://", "");
+    }
+
+    private void routeMessageToDataMart(String topicName, String json) {
+        if (topicName.equals(SPACEX_TOPIC)) {
+            processSatelliteEvent(json);
+        } else if (topicName.equals(WEATHER_TOPIC)) {
+            processWeatherEvent(json);
+        }
+    }
+
+    private void processSatelliteEvent(String json) {
+        SatelliteEvent sat = gson.fromJson(json, SatelliteEvent.class);
+        dataMart.addSatellite(sat);
+        System.out.println("🛰️ Satélite guardado en memoria: " + sat.id());
+    }
+
+    private void processWeatherEvent(String json) {
+        WeatherEvent weather = gson.fromJson(json, WeatherEvent.class);
+        dataMart.addWeather(weather);
+        System.out.println("☁️ Clima guardado en memoria: " + weather.name());
     }
 }
