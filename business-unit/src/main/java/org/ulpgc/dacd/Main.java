@@ -65,7 +65,7 @@ public class Main {
 
     private static List<WeatherEvent> getLocationWeather(MemoryDataMart dataMart, String location) {
         return dataMart.getWeatherEvents().stream()
-                .filter(w -> w.name().toLowerCase().contains(location.toLowerCase()))
+                .filter(w -> w.locationName().toLowerCase().contains(location.toLowerCase()))
                 .limit(3)
                 .toList();
     }
@@ -74,7 +74,7 @@ public class Main {
         return dataMart.getSatelliteEvents().stream()
                 .collect(Collectors.toMap(SatelliteEvent::id, s -> s, (existing, replacement) -> replacement))
                 .values().stream()
-                .map(s -> new RainFadeResponse.SatelliteInfo(s.id(), s.lat(), s.lon()))
+                .map(s -> new RainFadeResponse.SatelliteInfo(s.id(), s.latitude(), s.longitude()))
                 .limit(200)
                 .toList();
     }
@@ -83,7 +83,7 @@ public class Main {
         return weatherEvents.stream().map(weather -> {
             String risk = calculateRainFadeRisk(weather.description());
             RainFadeResponse.WeatherInfo weatherInfo = new RainFadeResponse.WeatherInfo(
-                    weather.temp(), weather.humidity(), 0, weather.description()
+                    weather.temperature(), weather.humidity(), 0, weather.description()
             );
             return new RainFadeResponse.Prediction("Predicción registrada", weatherInfo, satellites, risk);
         }).toList();

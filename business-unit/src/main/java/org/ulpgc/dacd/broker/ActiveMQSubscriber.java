@@ -85,6 +85,6 @@ public class ActiveMQSubscriber {
     private void processWeatherEvent(String json) {
         WeatherEvent weather = gson.fromJson(json, WeatherEvent.class);
         dataMart.addWeather(weather);
-        System.out.println("☁️ Clima guardado en memoria: " + weather.name());
+        System.out.println("☁️ Clima guardado en memoria: " + weather.locationName());
     }
 }

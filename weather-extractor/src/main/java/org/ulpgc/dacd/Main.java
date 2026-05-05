@@ -23,7 +23,7 @@ public class Main {
         if (key == null || key.isBlank()) {
             System.err.println("❌ ERROR: Variable de entorno '" + API_KEY_ENV_VAR + "' no configurada.");
             System.err.println("Por favor, configúrala en tu sistema o IDE antes de arrancar el recolector.");
-            System.exit(1); // Código 1 indica salida por error
+            System.exit(1);
         }
 
         return key;

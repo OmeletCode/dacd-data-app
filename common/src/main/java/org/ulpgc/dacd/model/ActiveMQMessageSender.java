@@ -4,13 +4,8 @@ import org.apache.activemq.ActiveMQConnectionFactory;
 import javax.jms.*;
 import java.util.List;
 
-public class ActiveMQMessageSender {
+public record ActiveMQMessageSender(String topicName) {
     private static final String BROKER_URL = "failover:(tcp://localhost:61616)";
-    private final String topicName;
-
-    public ActiveMQMessageSender(String topicName) {
-        this.topicName = topicName;
-    }
 
     public void sendMessages(List<String> jsonEvents) {
         if (jsonEvents == null || jsonEvents.isEmpty()) return;
