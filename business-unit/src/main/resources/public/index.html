@@ -80,15 +80,17 @@
                 const p = data.predictions[0];
                 const timestamp = new Date().toLocaleTimeString();
 
-                // Normalizamos el riesgo para evitar errores de mayúsculas/minúsculas
-                const riesgoNormalizado = p.rainFadeRisk.toUpperCase().trim();
+                // 1. CORRECCIÓN: Usamos p.risk
+                const riesgoNormalizado = p.risk.toUpperCase().trim();
 
                 document.getElementById('update-time').innerText = `Actualizado: ${timestamp}`;
                 document.getElementById('update-time').style.color = "rgba(255,255,255,0.6)";
                 document.getElementById('isla-nombre').innerText = data.location;
 
                 document.getElementById('clima-desc').innerText = `${p.weather.description} (${p.weather.temperature.toFixed(1)}ºC)`;
-                document.getElementById('sat-count').innerText = p.satellitesInView.length;
+
+                // 2. CORRECCIÓN: Usamos p.satellites
+                document.getElementById('sat-count').innerText = p.satellites.length;
                 document.getElementById('riesgo').innerText = riesgoNormalizado;
                 document.getElementById('risk-box').className = `risk-display risk-${riesgoNormalizado}`;
 
@@ -107,17 +109,17 @@
                 satelliteMarkers = [];
                 connectionLines = [];
 
-                p.satellitesInView.forEach(sat => {
-                    if (sat.lat !== 0 || sat.lon !== 0) {
+                // 3. CORRECCIÓN: Usamos p.satellites, sat.latitude y sat.longitude
+                p.satellites.forEach(sat => {
+                    if (sat.latitude !== 0 || sat.longitude !== 0) {
                         // Crear Marcador
-                        const m = L.marker([sat.lat, sat.lon], { icon: satelliteIcon }).addTo(map);
+                        const m = L.marker([sat.latitude, sat.longitude], { icon: satelliteIcon }).addTo(map);
                         m.bindTooltip(`ID: ${sat.id}`, { direction: 'top', offset: [0, -10] });
                         satelliteMarkers.push(m);
 
-                        // --- CORRECCIÓN AQUÍ ---
                         // Solo dibujamos la línea si el riesgo es MEDIUM o HIGH
                         if (riesgoNormalizado === 'MEDIUM' || riesgoNormalizado === 'HIGH') {
-                            const line = L.polyline([islandCoords, [sat.lat, sat.lon]], {
+                            const line = L.polyline([islandCoords, [sat.latitude, sat.longitude]], {
                                 color: getRiskColor(riesgoNormalizado),
                                 weight: 1.5,
                                 opacity: 0.5,
@@ -141,7 +143,6 @@
     }
 
     function getRiskColor(risk) {
-        // Aseguramos que la función también reciba el riesgo normalizado
         const r = risk.toUpperCase().trim();
         const colors = { 'HIGH': '#ff3366', 'MEDIUM': '#ffcc00', 'LOW': '#00ff88' };
         return colors[r] || '#00ff88';
