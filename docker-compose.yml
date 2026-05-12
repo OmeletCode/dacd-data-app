@@ -1,64 +1,111 @@
-services:
-  activemq:
-    image: rmohr/activemq:latest
-    container_name: starlink-broker
-    ports:
-      - "61616:61616"
-      - "8161:8161"
-    networks:
-      - dacd-network
+  services:
 
-  business-unit:
-    image: maven:3.9.6-eclipse-temurin-21
-    container_name: starlink-business-unit
-    working_dir: /app/business-unit
-    volumes:
-      - .:/app
-    environment:
-      - ACTIVEMQ_URL=tcp://activemq:61616
-    # AÑADIDA LA PALABRA COMPILE AQUÍ ABAJO 👇
-    command: >
-      mvn compile exec:java 
-      -Dexec.mainClass="org.ulpgc.dacd.business_unit.Main" 
-      -Dexec.args="/app/eventstore/prediction.Weather/Weather-Feeder/20260420.events /app/eventstore/sensor.SpaceX/SpaceX-Feeder/20260423.events"
-    ports:
-      - "8080:8080"
-    depends_on:
-      - activemq
-    networks:
-      - dacd-network
+    activemq:
+      image: rmohr/activemq:latest
+      container_name: starlink-broker
 
-  weather-extractor:
-    image: maven:3.9.6-eclipse-temurin-21
-    container_name: starlink-weather-extractor
-    working_dir: /app/weather-extractor
-    volumes:
-      - .:/app
-    environment:
-      - ACTIVEMQ_URL=tcp://activemq:61616
-      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
-    # AÑADIDA LA PALABRA COMPILE AQUÍ ABAJO 👇
-    command: mvn compile exec:java -Dexec.mainClass="org.ulpgc.wather_extractor.Main"
-    depends_on:
-      - activemq
-    networks:
-      - dacd-network
+      ports:
+        - "61616:61616"
+        - "8161:8161"
 
-  spacex-extractor:
-    image: maven:3.9.6-eclipse-temurin-21
-    container_name: starlink-spacex-extractor
-    working_dir: /app/spacex-extractor
-    volumes:
-      - .:/app
-    environment:
-      - ACTIVEMQ_URL=tcp://activemq:61616
-    # AÑADIDA LA PALABRA COMPILE AQUÍ ABAJO 👇
-    command: mvn compile exec:java -Dexec.mainClass="org.ulpgc.space_extractor.Main"
-    depends_on:
-      - activemq
-    networks:
-      - dacd-network
+      networks:
+        - starlink-network
 
-networks:
-  dacd-network:
-    driver: bridge
+    event-store-builder:
+      image: maven:3.9.6-eclipse-temurin-21
+      container_name: starlink-event-store
+
+      working_dir: /app/event-store-builder
+
+      volumes:
+        - .:/app
+
+      environment:
+        - ACTIVEMQ_URL=tcp://activemq:61616
+
+      command: >
+        mvn compile exec:java
+        -Dexec.mainClass="org.ulpgc.starlink.eventstore.Main"
+
+      depends_on:
+        - activemq
+
+      networks:
+        - starlink-network
+
+    rain-fade-monitor:
+      image: maven:3.9.6-eclipse-temurin-21
+      container_name: starlink-monitor-service
+
+      working_dir: /app/rain-fade-monitor
+
+      volumes:
+        - .:/app
+
+      environment:
+        - ACTIVEMQ_URL=tcp://activemq:61616
+
+      command: >
+            mvn compile exec:java
+            -Dexec.mainClass="org.ulpgc.starlink.monitor.Main"
+            -Dexec.args="/app/event-store-builder/eventstore /app/datamart.db"
+
+      ports:
+        - "7000:7000"
+
+      depends_on:
+        - activemq
+
+      networks:
+        - starlink-network
+
+    weather-extractor:
+      image: maven:3.9.6-eclipse-temurin-21
+      container_name: starlink-weather-extractor
+
+      working_dir: /app/weather-extractor
+
+      volumes:
+        - .:/app
+
+      environment:
+        - ACTIVEMQ_URL=tcp://activemq:61616
+        - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+
+      command: >
+        mvn compile exec:java
+        -Dexec.mainClass="org.ulpgc.starlink.weather.Main"
+
+      depends_on:
+        - activemq
+
+      networks:
+        - starlink-network
+
+    spacex-extractor:
+      image: maven:3.9.6-eclipse-temurin-21
+      container_name: starlink-spacex-extractor
+
+      working_dir: /app/spacex-extractor
+
+      volumes:
+        - .:/app
+
+      environment:
+        - ACTIVEMQ_URL=tcp://activemq:61616
+
+      command: >
+        mvn compile exec:java
+        -Dexec.mainClass="org.ulpgc.starlink.spacex.Main"
+
+      depends_on:
+        - activemq
+
+      networks:
+        - starlink-network
+
+  networks:
+
+    starlink-network:
+      driver: bridge
+
