@@ -22,7 +22,7 @@ public class WeatherSupplier {
         this.client = new OkHttpClient();
     }
 
-    public WeatherEvent get(double lat, double lon) throws IOException {
+    public WeatherEvent get(String cityName, double lat, double lon) throws IOException {
         String url = buildUrl(lat, lon);
         Request request = new Request.Builder().url(url).build();
 
@@ -31,7 +31,7 @@ public class WeatherSupplier {
                 System.err.println("Error de la API de OpenWeather: Código " + response.code());
                 return null;
             }
-            return parseWeatherEvent(response.body().string(), lat, lon);
+            return parseWeatherEvent(response.body().string(), cityName, lat, lon);
         }
     }
 
@@ -39,30 +39,24 @@ public class WeatherSupplier {
         return String.format("%s?lat=%s&lon=%s&appid=%s&units=metric", BASE_URL, lat, lon, apiKey);
     }
 
-    private WeatherEvent parseWeatherEvent(String jsonBody, double lat, double lon) {
+    private WeatherEvent parseWeatherEvent(String jsonBody, String cityName, double lat, double lon) {
         JsonObject json = JsonParser.parseString(jsonBody).getAsJsonObject();
 
-        long observationTime = json.get("dt").getAsLong();
         JsonObject mainData = json.getAsJsonObject("main");
 
         double temperature = mainData.get("temp").getAsDouble();
         int humidity = mainData.get("humidity").getAsInt();
-        double windSpeed = json.getAsJsonObject("wind").get("speed").getAsDouble();
         String description = json.getAsJsonArray("weather").get(0).getAsJsonObject().get("description").getAsString();
-        String locationName = json.get("name").getAsString();
         String timestamp = Instant.now().toString();
 
+        // ✅ AHORA SÍ: El orden cuadra exactamente con el record WeatherEvent
         return new WeatherEvent(
-                timestamp,
-                SOURCE_SYSTEM,
-                observationTime,
-                temperature,
-                humidity,
-                windSpeed,
-                description,
-                locationName,
-                lat,
-                lon
+                timestamp,      // 1. ts (El instante actual en formato ISO)
+                SOURCE_SYSTEM,  // 2. ss (El nombre de tu feeder)
+                temperature,    // 3. temp (Tus grados Celsius reales)
+                humidity,       // 4. humidity (El % de humedad)
+                description,    // 5. description (ej: "broken clouds")
+                cityName        // 6. name (El nombre limpio de la ciudad)
         );
     }
 }

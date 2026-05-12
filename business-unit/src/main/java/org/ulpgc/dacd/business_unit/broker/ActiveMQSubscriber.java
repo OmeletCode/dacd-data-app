@@ -4,20 +4,19 @@ import org.ulpgc.dacd.business_unit.model.WeatherEvent;
 import org.ulpgc.dacd.business_unit.model.SatelliteEvent;
 import com.google.gson.Gson;
 import org.apache.activemq.ActiveMQConnectionFactory;
-import org.ulpgc.dacd.business_unit.repository.MemoryDataMart;
+import org.ulpgc.dacd.business_unit.repository.SQLiteDataMart;
 
 import javax.jms.*;
 
 public class ActiveMQSubscriber {
-    private static final String URL = "failover:(tcp://localhost:61616)";
     private static final String CLIENT_ID = "BusinessUnit-Node1";
     private static final String SPACEX_TOPIC = "sensor.SpaceX";
     private static final String WEATHER_TOPIC = "prediction.Weather";
 
     private final Gson gson = new Gson();
-    private final MemoryDataMart dataMart;
+    private final SQLiteDataMart dataMart;
 
-    public ActiveMQSubscriber(MemoryDataMart dataMart) {
+    public ActiveMQSubscriber(SQLiteDataMart dataMart) {
         this.dataMart = dataMart;
     }
 
@@ -30,14 +29,17 @@ public class ActiveMQSubscriber {
             setupSubscriber(session, WEATHER_TOPIC, "Weather-BU-Sub");
 
             System.out.println("📡 Business Unit escuchando ActiveMQ en tiempo real...");
-
         } catch (JMSException e) {
             System.err.println("Error en la conexión ActiveMQ: " + e.getMessage());
         }
     }
 
     private Connection createConnection() throws JMSException {
-        ConnectionFactory connectionFactory = new ActiveMQConnectionFactory(URL);
+        String brokerUrl = System.getenv("ACTIVEMQ_URL");
+        if (brokerUrl == null || brokerUrl.isEmpty()) {
+            brokerUrl = "failover:(tcp://localhost:61616)";
+        }
+        ConnectionFactory connectionFactory = new ActiveMQConnectionFactory(brokerUrl);
         Connection connection = connectionFactory.createConnection();
         connection.setClientID(CLIENT_ID);
         connection.start();
@@ -53,38 +55,18 @@ public class ActiveMQSubscriber {
     private void processMessage(Message message) {
         try {
             if (!(message instanceof TextMessage textMessage)) return;
-
             String json = textMessage.getText();
-            String topicName = extractTopicName(message);
+            String topicName = message.getJMSDestination().toString().replace("topic://", "");
 
-            routeMessageToDataMart(topicName, json);
-
+            if (topicName.equals(SPACEX_TOPIC)) {
+                SatelliteEvent sat = gson.fromJson(json, SatelliteEvent.class);
+                dataMart.addSatellite(sat);
+            } else if (topicName.equals(WEATHER_TOPIC)) {
+                WeatherEvent weather = gson.fromJson(json, WeatherEvent.class);
+                dataMart.addWeather(weather);
+            }
         } catch (JMSException e) {
             System.err.println("Error procesando mensaje: " + e.getMessage());
         }
-    }
-
-    private String extractTopicName(Message message) throws JMSException {
-        return message.getJMSDestination().toString().replace("topic://", "");
-    }
-
-    private void routeMessageToDataMart(String topicName, String json) {
-        if (topicName.equals(SPACEX_TOPIC)) {
-            processSatelliteEvent(json);
-        } else if (topicName.equals(WEATHER_TOPIC)) {
-            processWeatherEvent(json);
-        }
-    }
-
-    private void processSatelliteEvent(String json) {
-        SatelliteEvent sat = gson.fromJson(json, SatelliteEvent.class);
-        dataMart.addSatellite(sat);
-        System.out.println("🛰️ Satélite guardado en memoria: " + sat.id());
-    }
-
-    private void processWeatherEvent(String json) {
-        WeatherEvent weather = gson.fromJson(json, WeatherEvent.class);
-        dataMart.addWeather(weather);
-        System.out.println("☁️ Clima guardado en memoria: " + weather.locationName());
     }
 }

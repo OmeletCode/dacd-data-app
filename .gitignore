@@ -41,3 +41,19 @@ build/
 # Bases de datos locales
 *.db
 *.db-journal
+
+
+# Archivos compilados de Maven
+target/
+*.class
+
+# Bases de Datos y Datalakes
+*.db
+eventstore/
+
+# Claves e IDs
+.env
+
+# Archivos de IntelliJ
+.idea/
+*.iml

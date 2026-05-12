@@ -4,12 +4,9 @@ import org.apache.activemq.ActiveMQConnectionFactory;
 import javax.jms.*;
 
 public record ActiveMQSubscriber(FileEventStore eventStore) {
-    private static final String BROKER_URL = "failover:(tcp://localhost:61616)";
     private static final String CLIENT_ID = "EventStoreBuilder-Node1";
     private static final String SPACEX_TOPIC = "sensor.SpaceX";
     private static final String WEATHER_TOPIC = "prediction.Weather";
-
-    // Inyectamos la dependencia por el constructor
 
     public void start() {
         try {
@@ -27,7 +24,13 @@ public record ActiveMQSubscriber(FileEventStore eventStore) {
     }
 
     private Connection createConnection() throws JMSException {
-        ConnectionFactory connectionFactory = new ActiveMQConnectionFactory(BROKER_URL);
+        // 🚀 MAGIA DE DOCKER
+        String brokerUrl = System.getenv("ACTIVEMQ_URL");
+        if (brokerUrl == null || brokerUrl.isEmpty()) {
+            brokerUrl = "failover:(tcp://localhost:61616)";
+        }
+
+        ConnectionFactory connectionFactory = new ActiveMQConnectionFactory(brokerUrl);
         Connection connection = connectionFactory.createConnection();
         connection.setClientID(CLIENT_ID);
         connection.start();
@@ -37,7 +40,6 @@ public record ActiveMQSubscriber(FileEventStore eventStore) {
     private void setupSubscriber(Session session, String topicName, String subscriptionName) throws JMSException {
         Topic topic = session.createTopic(topicName);
         MessageConsumer consumer = session.createDurableSubscriber(topic, subscriptionName);
-        // Usamos Method Reference para mantener el código limpio
         consumer.setMessageListener(this::processMessage);
     }
 

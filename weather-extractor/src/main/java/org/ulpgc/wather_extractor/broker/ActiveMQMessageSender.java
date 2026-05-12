@@ -6,7 +6,6 @@ import javax.jms.*;
 import java.util.List;
 
 public record ActiveMQMessageSender(String topicName) {
-    private static final String BROKER_URL = "failover:(tcp://localhost:61616)";
 
     public void sendMessages(List<String> jsonEvents) {
         if (jsonEvents == null || jsonEvents.isEmpty()) return;
@@ -25,7 +24,13 @@ public record ActiveMQMessageSender(String topicName) {
     }
 
     private Connection createConnection() throws JMSException {
-        ConnectionFactory connectionFactory = new ActiveMQConnectionFactory(BROKER_URL);
+        // 🚀 MAGIA DE DOCKER: Leemos la variable de entorno
+        String brokerUrl = System.getenv("ACTIVEMQ_URL");
+        if (brokerUrl == null || brokerUrl.isEmpty()) {
+            brokerUrl = "failover:(tcp://localhost:61616)"; // Fallback para IntelliJ
+        }
+
+        ConnectionFactory connectionFactory = new ActiveMQConnectionFactory(brokerUrl);
         Connection connection = connectionFactory.createConnection();
         connection.start();
         return connection;

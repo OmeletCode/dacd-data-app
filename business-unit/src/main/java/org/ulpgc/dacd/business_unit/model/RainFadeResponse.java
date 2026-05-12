@@ -8,10 +8,11 @@ public record RainFadeResponse(
         List<Prediction> predictions
 ) {
     public record Prediction(
-            String type,
+            String info,
             WeatherInfo weather,
             List<SatelliteInfo> satellites,
-            String risk
+            String risk,
+            List<Double> tempHistory // <-- ¡Esta es la clave!
     ) {}
 
     public record WeatherInfo(

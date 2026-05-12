@@ -3,11 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Satellite Rain Fade Monitor</title>
+    <title>Starlink Rain Fade Monitor</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --bg-dark: #0b0e14;
+            --glass: rgba(20, 24, 35, 0.85);
+            --accent: #00d2ff;
+            --low: #00ff88;
+            --medium: #ffcc00;
+            --high: #ff3366;
+            --text-main: #ffffff;
+            --text-dim: rgba(255, 255, 255, 0.6);
+        }
+
+        body, html {
+            margin: 0; padding: 0; height: 100%; width: 100%;
+            background: var(--bg-dark);
+            font-family: 'Inter', system-ui, sans-serif;
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        #map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+
+        .dashboard-overlay {
+            position: absolute; top: 20px; left: 20px; bottom: 20px; width: 340px; z-index: 1000;
+            background: var(--glass); backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px;
+            padding: 30px; display: flex; flex-direction: column;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+        }
+
+        .header { border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px; margin-bottom: 20px; }
+        .live-status { font-size: 0.65rem; font-weight: 900; letter-spacing: 2px; color: var(--low); display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+        .dot { height: 8px; width: 8px; background-color: var(--low); border-radius: 50%; box-shadow: 0 0 10px var(--low); animation: blink 1.5s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        .header h1 { margin: 0; font-size: 1.4rem; color: var(--accent); font-weight: 800; }
+        .header p { margin: 8px 0 0; font-size: 0.85rem; color: var(--text-dim); }
+
+        .island-selector {
+            width: 100%; padding: 12px; margin-bottom: 15px;
+            background: rgba(0, 210, 255, 0.1); border: 1px solid var(--accent);
+            color: var(--text-main); border-radius: 12px; font-weight: bold;
+            outline: none; cursor: pointer;
+        }
+        .island-selector option { background: var(--bg-dark); color: white; }
+
+        .stat-group { flex-grow: 1; overflow-y: auto; }
+        /* Ocultar barra de scroll para un look más limpio */
+        .stat-group::-webkit-scrollbar { display: none; }
+
+        .stat-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 18px; margin-bottom: 15px; }
+        .stat-label { font-size: 0.7rem; text-transform: uppercase; color: var(--text-dim); letter-spacing: 1.2px; margin-bottom: 6px; }
+        .stat-value { font-size: 1.15rem; font-weight: 600; text-transform: capitalize;}
+
+        .risk-display { text-align: center; padding: 24px; border-radius: 20px; margin-top: 10px; border: 2px solid transparent; transition: all 0.3s; }
+        .risk-LOW { border-color: var(--low); color: var(--low); background: rgba(0, 255, 136, 0.05); }
+        .risk-MEDIUM { border-color: var(--medium); color: var(--medium); background: rgba(255, 204, 0, 0.05); }
+        .risk-HIGH { border-color: var(--high); color: var(--high); background: rgba(255, 51, 102, 0.05); animation: pulseRisk 1s infinite; }
+
+        @keyframes pulseRisk { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); box-shadow: 0 0 15px rgba(255, 51, 102, 0.4); } }
+
+        .signal-interference { stroke-dasharray: 5, 15; animation: dash 0.5s linear infinite; }
+        @keyframes dash { to { stroke-dashoffset: 20; } }
+
+        .refresh-btn { background: var(--accent); color: var(--bg-dark); border: none; padding: 16px; border-radius: 14px; font-weight: 800; cursor: pointer; transition: all 0.3s; width: 100%; margin-top: 10px; }
+        .refresh-btn:hover { filter: brightness(1.1); transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0, 210, 255, 0.3); }
+
+        .sat-marker-container { background: transparent !important; border: none !important; display: flex; justify-content: center; align-items: center; }
+        .sat-emoji { font-size: 18px; filter: drop-shadow(0 0 5px rgba(0, 210, 255, 0.5)); }
+
+        .leaflet-popup-content-wrapper, .leaflet-tooltip { background: var(--bg-dark) !important; color: white !important; border: 1px solid rgba(255,255,255,0.1); }
+        .leaflet-popup-tip { background: var(--bg-dark) !important; }
+    </style>
 </head>
 <body>
 
@@ -15,19 +90,20 @@
 
 <aside class="dashboard-overlay">
     <div class="header">
-        <div class="live-status">
-            <span class="dot"></span> LIVE TELEMETRY
-        </div>
+        <div class="live-status"><span class="dot"></span> LIVE TELEMETRY</div>
         <h1>🛰️ STARLINK MONITOR</h1>
         <p id="update-time">Sincronizando...</p>
     </div>
 
-    <div class="stat-group">
-        <div class="stat-card">
-            <div class="stat-label">Ubicación</div>
-            <div class="stat-value" id="isla-nombre">--</div>
-        </div>
+    <select id="island-select" class="island-selector" onchange="cambiarIsla()">
+        <option value="Las Palmas">Las Palmas (Canarias)</option>
+        <option value="London">Londres (UK)</option>
+        <option value="Dubai">Dubái (EAU)</option>
+        <option value="Singapore">Singapur</option>
+        <option value="Seattle">Seattle (USA)</option>
+    </select>
 
+    <div class="stat-group">
         <div class="stat-card">
             <div class="stat-label">Clima Actual</div>
             <div class="stat-value" id="clima-desc">--</div>
@@ -35,121 +111,198 @@
 
         <div class="stat-card">
             <div class="stat-label">Satélites en rango</div>
-            <div class="stat-value"><span id="sat-count">0</span> unidades</div>
+            <div class="stat-value"><span id="sat-count">0</span> operando</div>
         </div>
 
         <div class="risk-display" id="risk-box">
-            <div class="stat-label" style="color: inherit">Riesgo Rain Fade</div>
+            <div class="stat-label" style="color: inherit">Riesgo ITU-R Rain Fade</div>
             <div class="stat-value" id="riesgo" style="font-size: 1.8rem;">---</div>
+        </div>
+
+        <div class="stat-card" style="margin-top: 15px; height: 160px; padding: 10px; display: flex; flex-direction: column;">
+            <div class="stat-label" style="margin-bottom: 2px;">Evolución Térmica</div>
+            <div style="flex-grow: 1; position: relative;">
+                <canvas id="tempChart"></canvas>
+            </div>
         </div>
     </div>
 
-    <button class="refresh-btn" onclick="actualizarDashboard()">
-        🔄 ACTUALIZAR DATOS
-    </button>
+    <button class="refresh-btn" onclick="actualizarDashboard()">🔄 SINCRONIZAR MANUAL</button>
 </aside>
 
 <script>
+    const islasData = {
+        "Las Palmas": [28.1235, -15.4363],
+        "London": [51.5074, -0.1278],
+        "Dubai": [25.2048, 55.2708],
+        "Singapore": [1.3521, 103.8198],
+        "Seattle": [47.6062, -122.3321]
+    };
+
+    let currentIsland = "Las Palmas";
     let isFirstLoad = true;
     let currentMarker;
     let satelliteMarkers = [];
     let connectionLines = [];
-    const islandCoords = [28.12, -15.43];
+    let ws;
+    let tempChart; // 📈 Variable para guardar la gráfica
 
-    // 1. Inicialización del Mapa
-    const map = L.map('map', { zoomControl: false }).setView([28.4, -15.8], 8);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap'
-    }).addTo(map);
+    const map = L.map('map', { zoomControl: false }).setView(islasData[currentIsland], 9);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     const satelliteIcon = L.divIcon({
         html: '<span class="sat-emoji">🛰️</span>',
-        className: 'sat-marker-container',
-        iconSize: [24, 24],
-        iconAnchor: [12, 12]
+        className: 'sat-marker-container', iconSize: [24, 24], iconAnchor: [12, 12]
     });
 
-    function actualizarDashboard() {
-        fetch('/api/rainfade/Las-Palmas')
-            .then(res => {
-                if (!res.ok) throw new Error("Servidor no disponible");
-                return res.json();
-            })
-            .then(data => {
-                const p = data.predictions[0];
-                const timestamp = new Date().toLocaleTimeString();
+    // 📈 FUNCIÓN PARA DIBUJAR/ACTUALIZAR LA GRÁFICA
+    function updateChart(historyData) {
+        if (!historyData || historyData.length === 0) return;
 
-                // 1. CORRECCIÓN: Usamos p.risk
-                const riesgoNormalizado = p.risk.toUpperCase().trim();
+        const ctx = document.getElementById('tempChart').getContext('2d');
+        const data = [...historyData].reverse(); // SQL devuelve desc, lo ponemos asc para la gráfica
+        const labels = data.map((_, i) => "");
 
-                document.getElementById('update-time').innerText = `Actualizado: ${timestamp}`;
-                document.getElementById('update-time').style.color = "rgba(255,255,255,0.6)";
-                document.getElementById('isla-nombre').innerText = data.location;
+        if (tempChart) {
+            tempChart.data.labels = labels;
+            tempChart.data.datasets[0].data = data;
+            tempChart.update('none');
+        } else {
+            // Estilos que hacen match con tu tema cyberpunk
+            Chart.defaults.color = 'rgba(255, 255, 255, 0.6)';
+            tempChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Temp ºC',
+                        data: data,
+                        borderColor: '#00d2ff',
+                        backgroundColor: 'rgba(0, 210, 255, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true,
+                        pointBackgroundColor: '#0b0e14',
+                        pointBorderColor: '#00d2ff',
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { enabled: true } },
+                    scales: {
+                        x: { display: false },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            border: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+    }
 
-                document.getElementById('clima-desc').innerText = `${p.weather.description} (${p.weather.temperature.toFixed(1)}ºC)`;
+    function conectarWebSocket() {
+        ws = new WebSocket(`ws://${window.location.host}/ws/rainfade`);
 
-                // 2. CORRECCIÓN: Usamos p.satellites
-                document.getElementById('sat-count').innerText = p.satellites.length;
-                document.getElementById('riesgo').innerText = riesgoNormalizado;
-                document.getElementById('risk-box').className = `risk-display risk-${riesgoNormalizado}`;
+        ws.onopen = () => {
+            console.log("✅ Conectado al radar en tiempo real");
+            document.getElementById('update-time').innerText = "Conectado al satélite...";
+            ws.send(currentIsland);
+        };
 
-                // Marcador de la Isla
-                if (currentMarker) map.removeLayer(currentMarker);
-                currentMarker = L.circleMarker(islandCoords, {
-                    radius: 12,
-                    fillColor: getRiskColor(riesgoNormalizado),
-                    color: "white", weight: 2, fillOpacity: 0.8
-                }).addTo(map);
-                currentMarker.bindPopup(`<b>${data.location}</b><br>Riesgo: ${riesgoNormalizado}`);
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
 
-                // Limpiar satélites y líneas anteriores
-                satelliteMarkers.forEach(m => map.removeLayer(m));
-                connectionLines.forEach(l => map.removeLayer(l));
-                satelliteMarkers = [];
-                connectionLines = [];
+            if (!data.predictions || data.predictions.length === 0) {
+                document.getElementById('update-time').innerText = "⚠️ BUSCANDO SEÑAL...";
+                document.getElementById('update-time').style.color = "#ffcc00";
+                return;
+            }
 
-                // 3. CORRECCIÓN: Usamos p.satellites, sat.latitude y sat.longitude
+            const p = data.predictions[0];
+            const timestamp = new Date().toLocaleTimeString();
+            const coordsActuales = islasData[currentIsland];
+            const riesgoNormalizado = p.risk ? p.risk.toUpperCase().trim() : "LOW";
+
+            document.getElementById('update-time').innerText = `En directo: ${timestamp}`;
+            document.getElementById('update-time').style.color = "rgba(0, 255, 136, 0.8)";
+            document.getElementById('clima-desc').innerText = `${p.weather.description} (${p.weather.temperature.toFixed(1)}ºC)`;
+            document.getElementById('sat-count').innerText = p.satellites ? p.satellites.length : 0;
+            document.getElementById('riesgo').innerText = riesgoNormalizado;
+            document.getElementById('risk-box').className = `risk-display risk-${riesgoNormalizado}`;
+
+            // 📈 LLAMADA A LA GRÁFICA
+            if (p.tempHistory) {
+                updateChart(p.tempHistory);
+            }
+
+            if (currentMarker) map.removeLayer(currentMarker);
+            currentMarker = L.circleMarker(coordsActuales, {
+                radius: 12, fillColor: getRiskColor(riesgoNormalizado), color: "white", weight: 2, fillOpacity: 0.8
+            }).addTo(map);
+            currentMarker.bindPopup(`<b>${data.location}</b><br>Riesgo: ${riesgoNormalizado}`);
+
+            satelliteMarkers.forEach(m => map.removeLayer(m));
+            connectionLines.forEach(l => map.removeLayer(l));
+            satelliteMarkers = []; connectionLines = [];
+
+            if (p.satellites) {
                 p.satellites.forEach(sat => {
                     if (sat.latitude !== 0 || sat.longitude !== 0) {
-                        // Crear Marcador
                         const m = L.marker([sat.latitude, sat.longitude], { icon: satelliteIcon }).addTo(map);
                         m.bindTooltip(`ID: ${sat.id}`, { direction: 'top', offset: [0, -10] });
                         satelliteMarkers.push(m);
 
-                        // Solo dibujamos la línea si el riesgo es MEDIUM o HIGH
                         if (riesgoNormalizado === 'MEDIUM' || riesgoNormalizado === 'HIGH') {
-                            const line = L.polyline([islandCoords, [sat.latitude, sat.longitude]], {
-                                color: getRiskColor(riesgoNormalizado),
-                                weight: 1.5,
-                                opacity: 0.5,
-                                dashArray: '5, 10'
+                            const className = riesgoNormalizado === 'HIGH' ? 'signal-interference' : '';
+                            const line = L.polyline([coordsActuales, [sat.latitude, sat.longitude]], {
+                                color: getRiskColor(riesgoNormalizado), weight: riesgoNormalizado === 'HIGH' ? 2 : 1, opacity: 0.6, className: className
                             }).addTo(map);
                             connectionLines.push(line);
                         }
                     }
                 });
+            }
+        };
 
-                if (isFirstLoad) {
-                    map.flyTo(islandCoords, 9, { duration: 1.5 });
-                    isFirstLoad = false;
-                }
-            })
-            .catch(err => {
-                console.error("Error API:", err);
-                document.getElementById('update-time').innerText = "⚠️ ERROR DE CONEXIÓN";
-                document.getElementById('update-time').style.color = "#ff3366";
-            });
+        ws.onclose = () => {
+            console.log("❌ Conexión perdida. Reconectando...");
+            document.getElementById('update-time').innerText = "Conexión perdida. Reconectando...";
+            document.getElementById('update-time').style.color = "#ff3366";
+            setTimeout(conectarWebSocket, 3000);
+        };
+    }
+
+    function cambiarIsla() {
+        currentIsland = document.getElementById('island-select').value;
+        map.flyTo(islasData[currentIsland], 9, { duration: 1.5 });
+
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(currentIsland);
+
+            // Ponemos la UI en "Buscando..." temporalmente hasta que el server conteste
+            document.getElementById('update-time').innerText = "⚠️ BUSCANDO SEÑAL...";
+            document.getElementById('update-time').style.color = "#ffcc00";
+        }
+    }
+
+    function actualizarDashboard() {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(currentIsland);
+        } else {
+            conectarWebSocket();
+        }
     }
 
     function getRiskColor(risk) {
-        const r = risk.toUpperCase().trim();
         const colors = { 'HIGH': '#ff3366', 'MEDIUM': '#ffcc00', 'LOW': '#00ff88' };
-        return colors[r] || '#00ff88';
+        return colors[risk] || '#00ff88';
     }
 
-    setInterval(actualizarDashboard, 5000);
-    actualizarDashboard();
+    conectarWebSocket();
 </script>
 
 </body>
