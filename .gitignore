@@ -49,7 +49,7 @@ target/
 
 # Bases de Datos y Datalakes
 *.db
-eventstore/
+/eventstore/
 
 # Claves e IDs
 .env

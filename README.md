@@ -22,6 +22,22 @@ El **Rain Fade** (atenuación por lluvia) es el principal factor de inestabilida
 
 ---
 
+## 🛠️ Justificación de Tecnologías y Datos
+
+### Elección de APIs
+*   **OpenWeatherMap:** Se ha seleccionado por su capacidad de proporcionar datos de **precipitación (rain intensity)** y **cobertura de nubes** con alta frecuencia de actualización. Estos parámetros son las variables de entrada críticas para el modelo matemático de atenuación.
+*   **SpaceX API (Leaf):** Proporciona la telemetría en tiempo real de los satélites Starlink. Se utiliza para calcular el ángulo de elevación respecto a la estación de tierra, factor clave en la pérdida de señal por el camino que recorre la onda a través de la atmósfera.
+
+### Estructura del Datamart
+Se ha optado por **SQLite** como motor de persistencia para el Datamart debido a su naturaleza *serverless*, lo que facilita la portabilidad y entrega del proyecto.
+*   **Tablas Principales:**
+    *   `satellites`: Almacena la última posición conocida de cada satélite identificado.
+    *   `weather`: Registra las condiciones climáticas actuales por zona geográfica.
+    *   `predictions`: Tabla calculada que cruza satélites y clima para determinar el riesgo de pérdida de señal.
+*   **Modo WAL:** Se activa el modo *Write-Ahead Logging* para permitir que el proceso de ingesta de datos no bloquee las consultas de la interfaz gráfica.
+
+---
+
 ## 🏗️ Arquitectura del Sistema (Multimódulo EDA)
 
 El proyecto implementa una arquitectura de **Microservicios Desacoplados** comunicados mediante un bus de eventos (Event-Driven Architecture), diseñada bajo los principios de *Clean Code* y maximizando el principio DRY:
@@ -153,3 +169,10 @@ Accede a `http://localhost:7000/`. El panel incluye:
 * **Mapa Leaflet:** Visualización de satélites y líneas de interferencia.
 * **Chart.js:** Gráfica de evolución térmica de las últimas 10 capturas.
 * **Monitor de Riesgo:** Indicador dinámico (LOW/MEDIUM/HIGH) basado en el clima.
+
+---
+
+## 📂 Muestra de Datos
+Para cumplir con los requisitos de la entrega, se han incluido ejemplos de los datos generados en el directorio `/sample-data`:
+*   **Event Store (`/sample-data/eventstore`):** Ejemplos de eventos NDJSON capturados por los feeders (SpaceX y Weather).
+*   **Datamart:** El esquema y estado del sistema se persisten en `datamart.db` (incluido en la raíz para la demo).
