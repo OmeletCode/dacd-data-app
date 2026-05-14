@@ -6,6 +6,8 @@ import java.util.Map;
 public record RainFadeResponse(
         String location,
         String timestamp,
+        String latestAvailable,
+        String earliestAvailable,
         List<Prediction> predictions,
         Map<String, String> healthStatus
 ) {

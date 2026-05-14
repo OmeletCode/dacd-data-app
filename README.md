@@ -6,8 +6,8 @@
 **Desarrollo de Aplicaciones para Ciencia de Datos**
 Grado en Ciencia e Ingeniería de Datos | ULPGC
 
-👨‍💻 **Desarrolladores:** Pablo Mellado y Yone Suárez
-☕ **Tecnología:** Java 21 | Apache ActiveMQ | Javalin | SQLite (WAL Mode) | Leaflet.js | Chart.js
+👨‍💻 **Developers:** Pablo Mellado & Yone Suárez (ULPGC - DACD 2026)
+☕ **Technology Stack:** Java 21 | Apache ActiveMQ | Javalin | SQLite (WAL Mode) | Leaflet.js | Chart.js | Prometheus | Grafana
 
 ---
 

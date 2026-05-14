@@ -9,7 +9,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public record   RainFadeService(DataMart dataMart) {
+public record RainFadeService(DataMart dataMart) {
+    public DataMart dataMart() { return dataMart; }
     private static final double KU_BAND_FACTOR_A = 0.0188;
     private static final double KU_BAND_FACTOR_B = 1.15;
     private static final double RAIN_HEIGHT_KM = 4.0; // Average height of the rain layer
@@ -58,9 +59,10 @@ public record   RainFadeService(DataMart dataMart) {
         List<SatelliteEvent> rawSatellites = dataMart.getActiveSatellitesByTime(800, timestamp);
         
         double rainRate = estimateRainRateMmPerHour(weather.description());
+        Instant refTime = Instant.parse(timestamp);
         
         List<RainFadeResponse.SatelliteInfo> satellites = rawSatellites.parallelStream()
-                .map(s -> calculateSatelliteStats(s, origin, rainRate))
+                .map(s -> calculateSatelliteStats(s, origin, rainRate, refTime))
                 .toList();
 
         List<Double> tempHistory = dataMart.getTempHistory(location);
@@ -76,12 +78,10 @@ public record   RainFadeService(DataMart dataMart) {
         ));
     }
 
-    private RainFadeResponse.SatelliteInfo calculateSatelliteStats(SatelliteEvent s, double[] origin, double rainRate) {
+    private RainFadeResponse.SatelliteInfo calculateSatelliteStats(SatelliteEvent s, double[] origin, double rainRate, Instant refTime) {
         // 🛰️ ORBITAL MOVEMENT SIMULATION
         // The SpaceX API is static. We add a time-based offset to simulate a LEO orbit.
-        // Typical LEO speed: ~7.5 km/s. One degree of longitude at the equator is ~111km.
-        // We simulate a displacement of ~0.05 degrees per second for visible movement.
-        long secondsSinceEpoch = Instant.now().getEpochSecond();
+        long secondsSinceEpoch = refTime.getEpochSecond();
         double timeOffset = (secondsSinceEpoch % 3600) * 0.04; // 1 hour cycle
         double simulatedLat = s.latitude() + (Math.sin(timeOffset * 0.1) * 2.0); // North-south oscillation
         double simulatedLon = ((s.longitude() + timeOffset + 180) % 360) - 180; // Continuous west-east movement

@@ -14,4 +14,6 @@ public interface DataMart {
     WeatherEvent getLatestWeatherByTime(String location, String maxTimestamp);
     List<SatelliteEvent> getActiveSatellitesByTime(int limit, String maxTimestamp);
     List<Double> getTempHistory(String location);
+    String getLatestTimestamp();
+    String getEarliestTimestamp();
 }

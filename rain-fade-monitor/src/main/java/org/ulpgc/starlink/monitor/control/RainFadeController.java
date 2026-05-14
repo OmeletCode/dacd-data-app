@@ -33,6 +33,8 @@ public class RainFadeController {
         return new RainFadeResponse(
                 location,
                 timestamp,
+                service.dataMart().getLatestTimestamp(),
+                service.dataMart().getEarliestTimestamp(),
                 service.getPredictionsForLocationAt(location, timestamp),
                 service.getServiceHealth()
         );

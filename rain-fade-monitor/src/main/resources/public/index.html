@@ -99,6 +99,7 @@
         <div class="live-status"><span class="dot"></span> LIVE TELEMETRY</div>
         <h1>🛰️ STARLINK MONITOR</h1>
         <p id="update-time">Sincronizando...</p>
+        <p id="latest-data-info" style="font-size: 0.7rem; color: var(--text-dim); margin: 0;">DB: --</p>
         <div class="health-bar" id="health-bar">
             <div class="health-item">
                 <div id="status-spacex" class="health-dot status-fail"></div> SpaceX
@@ -123,8 +124,9 @@
             <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
                 <input type="range" id="history-slider" min="0" max="24" value="0" step="1" style="width: 100%; cursor: pointer;" oninput="cambiarModoHistorico()">
                 <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-dim);">
-                    <span>Ahora</span>
+                    <span id="slider-min-label">Ahora</span>
                     <span id="slider-label">Hace 0h</span>
+                    <span id="slider-max-label">--</span>
                 </div>
             </div>
         </div>
@@ -302,6 +304,23 @@
             const data = JSON.parse(event.data);
 
             // 🩺 ACTUALIZACIÓN DE SALUD DE SERVICIOS (Siempre se debe actualizar)
+            if (data.latestAvailable && data.earliestAvailable) {
+                const latest = new Date(data.latestAvailable);
+                const earliest = new Date(data.earliestAvailable);
+                
+                // Calcular diferencia en horas
+                const diffHours = Math.ceil((latest - earliest) / (1000 * 60 * 60));
+                const slider = document.getElementById('history-slider');
+                
+                // Solo actualizar si el rango ha cambiado significativamente para evitar saltos
+                if (Math.abs(slider.max - diffHours) > 0) {
+                    slider.max = Math.max(1, diffHours);
+                    document.getElementById('slider-max-label').innerText = `-${slider.max}h (${earliest.toLocaleDateString()})`;
+                }
+
+                document.getElementById('latest-data-info').innerText = `Último dato: ${latest.toLocaleString()}`;
+            }
+
             if (data.healthStatus) {
                 const spx = document.getElementById('status-spacex');
                 const wtr = document.getElementById('status-weather');

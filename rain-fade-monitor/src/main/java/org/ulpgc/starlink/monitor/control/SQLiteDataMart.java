@@ -53,16 +53,17 @@ public class SQLiteDataMart implements DataMart {
 
     public void initTables() {
         try (Statement stmt = connection.createStatement()) {
-            stmt.execute("CREATE TABLE IF NOT EXISTS satellites (id TEXT PRIMARY KEY, latitude REAL, longitude REAL, timestamp TEXT)");
-            stmt.execute("CREATE TABLE IF NOT EXISTS weather (location TEXT PRIMARY KEY, description TEXT, temperature REAL, humidity INTEGER, timestamp TEXT)");
+            // Updated schemas to support history: PK is now (id/location, timestamp)
+            stmt.execute("CREATE TABLE IF NOT EXISTS satellites (id TEXT, latitude REAL, longitude REAL, timestamp TEXT, PRIMARY KEY (id, timestamp))");
+            stmt.execute("CREATE TABLE IF NOT EXISTS weather (location TEXT, description TEXT, temperature REAL, humidity INTEGER, timestamp TEXT, PRIMARY KEY (location, timestamp))");
             stmt.execute("CREATE TABLE IF NOT EXISTS weather_history (location TEXT, temp REAL, timestamp TEXT, PRIMARY KEY (location, timestamp))");
             stmt.execute("CREATE TABLE IF NOT EXISTS service_health (service_name TEXT PRIMARY KEY, last_seen TEXT)");
             
             // Indices for improved query performance
-            stmt.execute("CREATE INDEX IF NOT EXISTS idx_weather_history_loc_ts ON weather_history(location, timestamp DESC)");
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_weather_ts ON weather(timestamp DESC)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_satellites_ts ON satellites(timestamp DESC)");
             
-            logger.info("🗄️ Datamart structure verified with indices.");
+            logger.info("🗄️ Datamart structure verified with historical support.");
         } catch (SQLException e) {
             logger.error("❌ Error SQLite al crear tablas: {}", e.getMessage());
         }
@@ -168,6 +169,7 @@ public class SQLiteDataMart implements DataMart {
     }
 
     public synchronized WeatherEvent getLatestWeatherByTime(String location, String maxTimestamp) {
+        // Query history-aware: find the latest record that is NOT newer than maxTimestamp
         String sql = "SELECT * FROM weather WHERE location LIKE ? AND timestamp <= ? ORDER BY timestamp DESC LIMIT 1; ";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, "%" + location + "%");
@@ -180,9 +182,16 @@ public class SQLiteDataMart implements DataMart {
         return null;
     }
 
+
     public synchronized List<SatelliteEvent> getActiveSatellitesByTime(int limit, String maxTimestamp) {
         List<SatelliteEvent> satellites = new ArrayList<>();
-        String sql = "SELECT * FROM satellites WHERE timestamp <= ? ORDER BY timestamp DESC LIMIT ?";
+        // Complex query: For each satellite ID, find the latest position before or at maxTimestamp
+        String sql = "SELECT id, latitude, longitude, MAX(timestamp) as timestamp " +
+                     "FROM satellites " +
+                     "WHERE timestamp <= ? " +
+                     "GROUP BY id " +
+                     "ORDER BY timestamp DESC " +
+                     "LIMIT ?";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, maxTimestamp);
             pstmt.setInt(2, limit);
@@ -196,5 +205,23 @@ public class SQLiteDataMart implements DataMart {
 
     public synchronized List<SatelliteEvent> getActiveSatellites(int limit) {
         return getActiveSatellitesByTime(limit, Instant.now().toString());
+    }
+
+    @Override
+    public synchronized String getLatestTimestamp() {
+        String sql = "SELECT MAX(ts) FROM (SELECT MAX(timestamp) as ts FROM weather UNION SELECT MAX(timestamp) as ts FROM satellites)";
+        try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+            if (rs.next()) return rs.getString(1);
+        } catch (SQLException e) { e.printStackTrace(); }
+        return Instant.now().toString();
+    }
+
+    @Override
+    public synchronized String getEarliestTimestamp() {
+        String sql = "SELECT MIN(ts) FROM (SELECT MIN(timestamp) as ts FROM weather UNION SELECT MIN(timestamp) as ts FROM satellites)";
+        try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+            if (rs.next()) return rs.getString(1);
+        } catch (SQLException e) { e.printStackTrace(); }
+        return Instant.now().toString();
     }
 }
