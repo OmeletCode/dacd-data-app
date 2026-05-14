@@ -46,10 +46,10 @@ public class ActiveMQSubscriber {
             spaceXConsumer.setMessageListener(listener);
             weatherConsumer.setMessageListener(listener);
 
-            logger.info("✅ Event Store Builder conectado a {} y esperando mensajes...", brokerUrl);
+            logger.info("Event Store Builder connected to {} and waiting for messages...", brokerUrl);
 
         } catch (JMSException e) {
-            logger.error("Error conectando a ActiveMQ: {}", e.getMessage());
+            logger.error("Error connecting to ActiveMQ: {}", e.getMessage());
         }
     }
 }

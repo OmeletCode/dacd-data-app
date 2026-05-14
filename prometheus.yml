@@ -5,4 +5,4 @@ scrape_configs:
   - job_name: 'rain-fade-monitor'
     metrics_path: '/metrics'
     static_configs:
-      - targets: ['rain-fade-monitor:7000']
+      - targets: ['starlink-monitor-service:7000']

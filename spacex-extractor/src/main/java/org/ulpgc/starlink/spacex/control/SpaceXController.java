@@ -28,13 +28,13 @@ public class SpaceXController {
     }
 
     private void performExtractionCycle() {
-        System.out.println("\n[ " + LocalTime.now() + " ] 🛰️ Iniciando captura de SpaceX...");
+        System.out.println("\n[ " + LocalTime.now() + " ] 🛰️ Starting SpaceX telemetry capture...");
 
         try {
             List<SatelliteEvent> events = supplier.getSatellites();
 
             if (events == null || events.isEmpty()) {
-                System.out.println("⚠️ ATENCIÓN: La lista de satélites llegó vacía en este ciclo.");
+                System.out.println("⚠️ WARNING: Satellite list received empty in this cycle.");
                 return;
             }
 
@@ -44,11 +44,11 @@ public class SpaceXController {
 
             sender.sendMessages(jsonEvents);
 
-            System.out.println("✅ ÉXITO: Se han procesado y enviado " + events.size() + " satélites.");
-            System.out.println("⏳ Esperando " + EXECUTION_INTERVAL_SECONDS + " segundos para el próximo ciclo...");
+            System.out.println("✅ SUCCESS: Processed and sent " + events.size() + " satellites.");
+            System.out.println("⏳ Waiting " + EXECUTION_INTERVAL_SECONDS + " seconds for next cycle...");
 
         } catch (Exception e) {
-            System.err.println("❌ ERROR en el ciclo de captura: " + e.getMessage());
+            System.err.println("❌ ERROR in extraction cycle: " + e.getMessage());
         }
     }
 }

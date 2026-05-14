@@ -24,18 +24,18 @@ public record UIService(RainFadeController controller) {
 
         logger.info("🚀 Servidor UIService iniciado en el puerto {}", port);
 
-        // 📊 Endpoint de Métricas (Prometheus)
+        // Prometheus Metrics Endpoint
         app.get("/metrics", ctx -> {
             ctx.contentType("text/plain").result(registry.scrape());
         });
 
-        // 🩺 Endpoint de Monitorización (Health Check)
+        // Health Check Endpoint
         app.get("/api/v1/health", ctx -> {
             ctx.status(200).result("UP");
         });
 
-        // 🛰️ Endpoint REST para Predicciones (Consultas puntuales)
-        // Ejemplo: /api/v1/predictions/LasPalmas?hours=0
+        // REST Endpoint for Predictions
+        // Example: /api/v1/predictions/LasPalmas?hours=0
         app.get("/api/v1/predictions/{location}", ctx -> {
             String location = ctx.pathParam("location");
             int hours = ctx.queryParamAsClass("hours", Integer.class).getOrDefault(0);
@@ -64,7 +64,7 @@ public record UIService(RainFadeController controller) {
             });
         });
 
-        // El controlador se encarga de emitir los datos periódicamente
+        // The controller handles periodic data broadcasting
         controller.startBroadcaster();
     }
 }

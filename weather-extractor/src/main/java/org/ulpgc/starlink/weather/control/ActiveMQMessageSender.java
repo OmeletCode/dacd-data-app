@@ -35,9 +35,10 @@ public record ActiveMQMessageSender(String topicName) {
         }
     }
     private Connection createConnection() throws JMSException {
+        // Read broker URL from environment variables for Docker compatibility
         String brokerUrl = System.getenv("ACTIVEMQ_URL");
         if (brokerUrl == null || brokerUrl.isEmpty()) {
-            brokerUrl = "failover:(tcp://localhost:61616)";
+            brokerUrl = "failover:(tcp://localhost:61616)"; // Local fallback
         }
 
         ConnectionFactory connectionFactory = new ActiveMQConnectionFactory(brokerUrl);
@@ -50,6 +51,6 @@ public record ActiveMQMessageSender(String topicName) {
         for (String json : jsonEvents) {
             producer.send(session.createTextMessage(json));
         }
-        logger.info("-> {} mensajes enviados con éxito al topic: {}", jsonEvents.size(), topicName);
+        logger.info("Successfully sent {} messages to topic: {}", jsonEvents.size(), topicName);
     }
 }

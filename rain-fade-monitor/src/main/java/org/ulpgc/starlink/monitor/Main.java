@@ -46,7 +46,7 @@ public class Main {
         ActiveMQSubscriber subscriber = new ActiveMQSubscriber(brokerUrl, dataMart);
         subscriber.start();
 
-        // FLUJO REQUERIDO: UIService -> RainFadeController -> RainFadeService
+        // Architectural Flow: UIService -> RainFadeController -> RainFadeService
         RainFadeService service = new RainFadeService(dataMart);
         RainFadeController controller = new RainFadeController(service);
         UIService uiService = new UIService(controller);

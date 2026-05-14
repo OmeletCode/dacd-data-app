@@ -34,13 +34,13 @@ public class SQLiteDataMart implements DataMart {
 
     private void configureDatabase() {
         try (Statement stmt = connection.createStatement()) {
-            stmt.execute("PRAGMA journal_mode=WAL;"); // Habilitar modo WAL para concurrencia real
-            stmt.execute("PRAGMA synchronous=NORMAL;"); // Más seguro que OFF, recomendado para WAL
+            stmt.execute("PRAGMA journal_mode=WAL;"); // Enable WAL mode for better concurrency
+            stmt.execute("PRAGMA synchronous=NORMAL;"); // Recommended for WAL mode
             stmt.execute("PRAGMA temp_store=MEMORY;");
             stmt.execute("PRAGMA cache_size=-64000;"); // 64MB cache
             stmt.execute("PRAGMA busy_timeout=10000;");
         } catch (SQLException e) {
-            logger.warn("⚠️ Error configurando SQLite: {}", e.getMessage());
+            logger.warn("⚠️ Error configuring SQLite: {}", e.getMessage());
         }
     }
 
@@ -58,11 +58,11 @@ public class SQLiteDataMart implements DataMart {
             stmt.execute("CREATE TABLE IF NOT EXISTS weather_history (location TEXT, temp REAL, timestamp TEXT, PRIMARY KEY (location, timestamp))");
             stmt.execute("CREATE TABLE IF NOT EXISTS service_health (service_name TEXT PRIMARY KEY, last_seen TEXT)");
             
-            // Índices para mejorar el rendimiento de consultas frecuentes
+            // Indices for improved query performance
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_weather_history_loc_ts ON weather_history(location, timestamp DESC)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_satellites_ts ON satellites(timestamp DESC)");
             
-            logger.info("🗄️ Estructura de Datamart verificada con índices.");
+            logger.info("🗄️ Datamart structure verified with indices.");
         } catch (SQLException e) {
             logger.error("❌ Error SQLite al crear tablas: {}", e.getMessage());
         }

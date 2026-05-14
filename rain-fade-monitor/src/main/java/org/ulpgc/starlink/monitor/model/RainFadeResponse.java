@@ -15,7 +15,7 @@ public record RainFadeResponse(
             List<SatelliteInfo> satellites,
             String risk,
             List<Double> tempHistory,
-            double maxAttenuationDb // <-- Nuevo: máxima atenuación detectada
+            double maxAttenuationDb
     ) {}
 
     public record WeatherInfo(
@@ -29,7 +29,7 @@ public record RainFadeResponse(
             String id,
             double latitude,
             double longitude,
-            double attenuationDb, // <-- Nuevo: atenuación específica por satélite
-            double elevation // <-- Nuevo: ángulo de elevación
+            double attenuationDb,
+            double elevation
     ) {}
 }

@@ -9,10 +9,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public record RainFadeService(DataMart dataMart) {
+public record   RainFadeService(DataMart dataMart) {
     private static final double KU_BAND_FACTOR_A = 0.0188;
     private static final double KU_BAND_FACTOR_B = 1.15;
-    private static final double RAIN_HEIGHT_KM = 4.0; // Altura promedio de la capa de lluvia
+    private static final double RAIN_HEIGHT_KM = 4.0; // Average height of the rain layer
     
     private static final Map<String, double[]> ISLAND_COORDS = Map.of(
         "Las Palmas", new double[]{28.1235, -15.4363},
@@ -24,9 +24,8 @@ public record RainFadeService(DataMart dataMart) {
 
     public Map<String, String> getServiceHealth() {
         Map<String, String> health = new HashMap<>();
-        // Registramos nombres que coincidan exactamente con lo que llega (en minúsculas en DB)
-        health.put("SpaceX-Feeder", checkService("spacex-feeder", 300)); // 5 min
-        health.put("Weather-Feeder", checkService("weather-feeder", 1200)); // 20 min
+        health.put("SpaceX-Feeder", checkService("spacex-feeder", 300)); // 5 min threshold
+        health.put("Weather-Feeder", checkService("weather-feeder", 1200)); // 20 min threshold
         return health;
     }
 
@@ -34,8 +33,7 @@ public record RainFadeService(DataMart dataMart) {
         String lastSeenStr = dataMart.getServiceLastSeen(name);
         if (lastSeenStr == null) return "FAIL";
         try {
-            // Si el satélite se mueve, el mensaje está llegando.
-            // A veces el reloj del contenedor o el TS del evento tienen desfase.
+            // Verify if the service is active by checking the last heartbeat timestamp.
             Instant lastSeen = Instant.parse(lastSeenStr);
             long diffSeconds = Math.abs(Instant.now().getEpochSecond() - lastSeen.getEpochSecond());
             
@@ -43,7 +41,7 @@ public record RainFadeService(DataMart dataMart) {
                 return "OK";
             }
         } catch (Exception e) {
-            System.err.println("Error parseando salud para " + name + ": " + e.getMessage());
+            System.err.println("Error parsing health for " + name + ": " + e.getMessage());
         }
         return "FAIL";
     }
@@ -79,24 +77,33 @@ public record RainFadeService(DataMart dataMart) {
     }
 
     private RainFadeResponse.SatelliteInfo calculateSatelliteStats(SatelliteEvent s, double[] origin, double rainRate) {
-        double elevation = calculateElevation(origin[0], origin[1], s.latitude(), s.longitude());
+        // 🛰️ ORBITAL MOVEMENT SIMULATION
+        // The SpaceX API is static. We add a time-based offset to simulate a LEO orbit.
+        // Typical LEO speed: ~7.5 km/s. One degree of longitude at the equator is ~111km.
+        // We simulate a displacement of ~0.05 degrees per second for visible movement.
+        long secondsSinceEpoch = Instant.now().getEpochSecond();
+        double timeOffset = (secondsSinceEpoch % 3600) * 0.04; // 1 hour cycle
+        double simulatedLat = s.latitude() + (Math.sin(timeOffset * 0.1) * 2.0); // North-south oscillation
+        double simulatedLon = ((s.longitude() + timeOffset + 180) % 360) - 180; // Continuous west-east movement
+
+        double elevation = calculateElevation(origin[0], origin[1], simulatedLat, simulatedLon);
         
-        // Base de atenuación atmosférica (incluso sin lluvia hay una pequeña pérdida)
+        // Base atmospheric attenuation (even without rain there is a small loss)
         double attenuation = 0.05 + (Math.random() * 0.05); 
         
         if (elevation > 5) { 
             double slantPath = RAIN_HEIGHT_KM / Math.sin(Math.toRadians(elevation));
-            // Si hay lluvia, sumamos la atenuación por lluvia
+            // Add rain attenuation if rain is present
             if (rainRate > 0) {
                 double gamma = KU_BAND_FACTOR_A * Math.pow(rainRate, KU_BAND_FACTOR_B);
                 attenuation += (gamma * slantPath);
             } else if (elevation < 20) {
-                // Si el satélite está muy bajo, la atmósfera misma atenúa más
+                // Higher atmospheric attenuation at low elevation angles
                 attenuation += (0.2 * (20 - elevation) / 20);
             }
         }
 
-        return new RainFadeResponse.SatelliteInfo(s.id(), s.latitude(), s.longitude(), attenuation, elevation);
+        return new RainFadeResponse.SatelliteInfo(s.id(), simulatedLat, simulatedLon, attenuation, elevation);
     }
 
     String determineRisk(double db) {
@@ -106,13 +113,13 @@ public record RainFadeService(DataMart dataMart) {
     }
 
     private double calculateElevation(double lat1, double lon1, double lat2, double lon2) {
-        double R = 6371.0; // Radio de la Tierra en km
-        double h = 550.0;  // Altura órbita Starlink en km
+        double R = 6371.0; // Earth radius in km
+        double h = 550.0;  // Starlink orbit height in km
         
-        double d = calculateDistance(lat1, lon1, lat2, lon2); // Distancia en superficie en km
+        double d = calculateDistance(lat1, lon1, lat2, lon2); // Surface distance in km
 
-        // Geometría del satélite: estimación del ángulo de elevación
-        // epsilon = arctan( (h * (2R + h) - d^2) / (2d * (R + h)) ) - aproximación
+        // Satellite geometry: elevation angle estimation
+        // epsilon = arctan( (h * (2R + h) - d^2) / (2d * (R + h)) ) - approximation
         double elevation = Math.toDegrees(Math.atan((h / d) - (d / (2 * R))));
         
         return Math.max(0, Math.min(90, elevation));

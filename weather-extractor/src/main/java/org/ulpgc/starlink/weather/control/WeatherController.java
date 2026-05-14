@@ -38,14 +38,14 @@ public class WeatherController {
     }
 
     private void performExtractionCycle() {
-        System.out.println("\n[ " + LocalTime.now() + " ] ☁️ Iniciando ciclo de extracción PARALELO...");
+        System.out.println("\n[ " + LocalTime.now() + " ] ☁️ Starting PARALLEL extraction cycle...");
 
         List<CompletableFuture<Void>> futures = TARGET_LOCATIONS.stream()
                 .map(loc -> CompletableFuture.runAsync(() -> processLocation(loc), workerPool))
                 .toList();
 
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
-        System.out.println("[ " + LocalTime.now() + " ] ✅ Ciclo de extracción completado.");
+        System.out.println("[ " + LocalTime.now() + " ] ✅ Extraction cycle completed.");
     }
 
     private void processLocation(Location loc) {
@@ -55,13 +55,13 @@ public class WeatherController {
             if (weatherEvent != null) {
                 String json = jsonSerializer.serialize(weatherEvent);
                 sender.sendMessages(List.of(json));
-                System.out.println("✅ Clima enviado para: " + loc.name() + " [Thread: " + Thread.currentThread().getName() + "]");
+                System.out.println("✅ Weather sent for: " + loc.name() + " [Thread: " + Thread.currentThread().getName() + "]");
             } else {
-                System.out.println("⚠️ Sin datos para: " + loc.name());
+                System.out.println("⚠️ No data for: " + loc.name());
             }
 
         } catch (Exception e) {
-            System.err.println("❌ Error al capturar el clima de " + loc.name() + ": " + e.getMessage());
+            System.err.println("❌ Error capturing weather for " + loc.name() + ": " + e.getMessage());
         }
     }
 }

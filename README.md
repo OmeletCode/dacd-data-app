@@ -11,6 +11,10 @@ Grado en Ciencia e Ingeniería de Datos | ULPGC
 
 ---
 
+![img.png](img.png)
+
+---
+
 ## 💡 Propuesta de Valor: Monitorización Predictiva y Análisis Histórico
 
 El **Rain Fade** (atenuación por lluvia) es el factor crítico de inestabilidad en conexiones satelitales de Banda Ku (Starlink). Este sistema actúa como un monitor preventivo que cruza telemetría orbital en tiempo real con datos meteorológicos de alta precisión.
@@ -232,17 +236,29 @@ El sistema utiliza imágenes **multietapa** (distroless-like) basadas en JRE 21 
 
 ---
 
-## 📊 Muestra de Datos y Uso
+## 🔍 Guía de Verificación (Showcase para Presentación)
 
-### Ejemplos de Uso (API WebSocket)
-El servidor escucha en `ws://localhost:7000/ws/rainfade`.
-*   **Mensaje para tiempo real:** `"Las Palmas"`
-*   **Mensaje para histórico:** `"London:5"` (Ver datos de Londres de hace 5 horas).
+Para demostrar el flujo de datos real y la arquitectura distribuida del sistema, se recomiendan las siguientes comprobaciones durante la evaluación:
 
-### Datos de Ejemplo
-El repositorio incluye la carpeta `/sample-data` con:
-*   **Event Store:** Archivos `.events` reales capturados durante el desarrollo.
-*   **Datamart:** Una muestra de la base de datos `datamart-sample.sqlite`.
+### 1. Flujo de Datos en Tiempo Real (ActiveMQ)
+Acceder al panel de control del Broker: [http://localhost:8161/admin/](http://localhost:8161/admin/) (Credenciales: `admin` / `admin`).
+*   **Comprobación:** En la pestaña `Topics`, observar cómo aumentan los contadores de `Messages Enqueued` en `sensor.SpaceX` y `prediction.Weather`. Esto demuestra el desacoplamiento total entre los extractores y el monitor mediante el modelo EAI.
+
+### 2. Trazabilidad y Logs (Docker)
+Ejecutar el siguiente comando en la terminal para ver la actividad del servidor en vivo:
+```bash
+docker logs -f starlink-monitor-service
+```
+*   **Qué observar:** El proceso de carga inicial de 50,000 eventos (Batch Layer), la conexión al broker y la apertura/cierre de túneles WebSocket al interactuar con la web.
+
+### 3. Observabilidad y Métricas (Grafana)
+Acceder a [http://localhost:3000](http://localhost:3000) (Credenciales: `admin` / `admin`).
+*   **Dashboard:** Seleccionar el "Starlink Monitor Dashboard".
+*   **Comprobación:** Observar las gráficas de conexiones WebSocket, uso de CPU y memoria. Es la prueba de que el sistema está siendo monitorizado profesionalmente con el stack Prometheus + Grafana.
+
+### 4. Modo Histórico (Event Sourcing)
+En la interfaz web ([http://localhost:7000](http://localhost:7000)), desplazar el slider de "Modo de Visualización" hacia atrás.
+*   **Qué observar:** El monitor recuperará instantáneamente datos del Data Mart (SQLite) correspondientes al pasado, demostrando la persistencia y la capacidad de "Time Travel" de la arquitectura Lambda implementada.
 
 ---
-**DACD 2026** | *Building resilient data systems.*
+**DACD 2026**
