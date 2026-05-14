@@ -1,51 +1,56 @@
 package org.ulpgc.starlink.monitor;
 
-import org.ulpgc.starlink.monitor.control.RainFadeController;
-import org.ulpgc.starlink.monitor.infrastructure.broker.ActiveMQSubscriber;
-import org.ulpgc.starlink.monitor.infrastructure.persistance.EventStoreReader;
-import org.ulpgc.starlink.monitor.infrastructure.persistance.SQLiteDataMart;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.ulpgc.starlink.monitor.control.*;
+import org.ulpgc.starlink.monitor.view.UIService;
 import com.google.gson.JsonObject;
-import org.ulpgc.starlink.monitor.services.RainFadeService;
 
 import java.util.List;
 
 public class Main {
+    private static final Logger logger = LoggerFactory.getLogger(Main.class);
+
     public static void main(String[] args) {
-        // 1. Configuración de rutas (idealmente por program arguments)
         String eventStorePath = args.length > 0 ? args[0] : "eventstore";
         String dbPath = args.length > 1 ? args[1] : "datamart.db";
 
-        // 2. Inicializar Repositorio (Datamart)
         SQLiteDataMart dataMart = new SQLiteDataMart(dbPath);
-        dataMart.initTables(); // Crea las tablas si no existen
+        dataMart.initTables();
 
-        // 3. CARGA DE HISTÓRICOS (Lo que pidió el profesor)
-        System.out.println("Cargando datos históricos desde: " + eventStorePath);
-
+        logger.info("🚀 Iniciando carga histórica (Limitada a los últimos 50k eventos para estabilidad)...");
         EventStoreReader reader = new EventStoreReader(eventStorePath);
-        List<JsonObject> historicalEvents = reader.readAllEvents();
+        
+        long startTime = System.currentTimeMillis();
+        java.util.concurrent.atomic.AtomicInteger count = new java.util.concurrent.atomic.AtomicInteger(0);
+        int MAX_HISTORICAL_EVENTS = 50000;
 
-        for (JsonObject event : historicalEvents) {
-            // Aquí procesas el JsonObject según sea Weather o SpaceX
-            // y lo guardas en el datamart
-            dataMart.save(event);
-        }
+        dataMart.beginTransaction();
+        reader.readAndProcessEvents(event -> {
+            if (count.get() < MAX_HISTORICAL_EVENTS) {
+                dataMart.save(event);
+                int current = count.incrementAndGet();
+                if (current % 10000 == 0) {
+                    logger.info("📊 Procesados {} eventos...", current);
+                }
+            }
+        });
+        dataMart.commitTransaction();
 
-        System.out.println(
-                "Carga histórica completada. Eventos procesados: "
-                        + historicalEvents.size()
-        );
+        long endTime = System.currentTimeMillis();
+        logger.info("✅ Carga finalizada: {} eventos en {}s", count.get(), (endTime - startTime) / 1000);
 
-        // 4. Iniciar Suscriptor en Tiempo Real
-        ActiveMQSubscriber subscriber =
-                new ActiveMQSubscriber("tcp://localhost:61616", dataMart);
+        String brokerUrl = System.getenv("ACTIVEMQ_URL");
+        if (brokerUrl == null) brokerUrl = "tcp://localhost:61616";
 
+        ActiveMQSubscriber subscriber = new ActiveMQSubscriber(brokerUrl, dataMart);
         subscriber.start();
 
-        // 5. Iniciar Servidor API/Controlador (Javalin u otro)
+        // FLUJO REQUERIDO: UIService -> RainFadeController -> RainFadeService
         RainFadeService service = new RainFadeService(dataMart);
         RainFadeController controller = new RainFadeController(service);
+        UIService uiService = new UIService(controller);
 
-        controller.start(7000);
+        uiService.start(7000);
     }
 }

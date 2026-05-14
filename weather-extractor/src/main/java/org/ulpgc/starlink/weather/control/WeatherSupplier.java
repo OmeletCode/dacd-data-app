@@ -1,4 +1,4 @@
-package org.ulpgc.starlink.weather.infrastructure.api;
+package org.ulpgc.starlink.weather.control;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -49,14 +49,13 @@ public class WeatherSupplier {
         String description = json.getAsJsonArray("weather").get(0).getAsJsonObject().get("description").getAsString();
         String timestamp = Instant.now().toString();
 
-        // ✅ AHORA SÍ: El orden cuadra exactamente con el record WeatherEvent
         return new WeatherEvent(
-                timestamp,      // 1. ts (El instante actual en formato ISO)
-                SOURCE_SYSTEM,  // 2. ss (El nombre de tu feeder)
-                temperature,    // 3. temp (Tus grados Celsius reales)
-                humidity,       // 4. humidity (El % de humedad)
-                description,    // 5. description (ej: "broken clouds")
-                cityName        // 6. name (El nombre limpio de la ciudad)
+                timestamp,
+                SOURCE_SYSTEM,
+                temperature,
+                humidity,
+                description,
+                cityName
         );
     }
 }

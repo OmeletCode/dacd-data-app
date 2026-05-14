@@ -1,4 +1,4 @@
-package org.ulpgc.starlink.spacex.infrastructure.broker;
+package org.ulpgc.starlink.spacex.control;
 
 import com.google.gson.Gson;
 

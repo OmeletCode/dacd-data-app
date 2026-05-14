@@ -1,22 +1,21 @@
 package org.ulpgc.starlink.spacex.control;
 
 import org.ulpgc.starlink.spacex.model.SatelliteEvent;
-import org.ulpgc.starlink.spacex.infrastructure.broker.ActiveMQMessageSender;
-import org.ulpgc.starlink.spacex.infrastructure.broker.GsonEventSerializer;
-import org.ulpgc.starlink.spacex.infrastructure.api.SpaceXSupplier;
 
 import java.time.LocalTime;
 import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class SpaceXController {
-    private static final long EXECUTION_INTERVAL_MS = 60000;
+    private static final long EXECUTION_INTERVAL_SECONDS = 60;
     private static final String SPACEX_TOPIC = "sensor.SpaceX";
 
     private final SpaceXSupplier supplier;
     private final GsonEventSerializer jsonSerializer;
     private final ActiveMQMessageSender sender;
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     public SpaceXController(SpaceXSupplier supplier) {
         this.supplier = supplier;
@@ -25,13 +24,7 @@ public class SpaceXController {
     }
 
     public void execute() {
-        Timer timer = new Timer();
-        timer.scheduleAtFixedRate(new TimerTask() {
-            @Override
-            public void run() {
-                performExtractionCycle();
-            }
-        }, 0, EXECUTION_INTERVAL_MS);
+        scheduler.scheduleAtFixedRate(this::performExtractionCycle, 0, EXECUTION_INTERVAL_SECONDS, TimeUnit.SECONDS);
     }
 
     private void performExtractionCycle() {
@@ -45,7 +38,6 @@ public class SpaceXController {
                 return;
             }
 
-            // --- LA MAGIA RECUPERADA ---
             List<String> jsonEvents = events.stream()
                     .map(jsonSerializer::serialize)
                     .toList();
@@ -53,7 +45,7 @@ public class SpaceXController {
             sender.sendMessages(jsonEvents);
 
             System.out.println("✅ ÉXITO: Se han procesado y enviado " + events.size() + " satélites.");
-            System.out.println("⏳ Esperando " + (EXECUTION_INTERVAL_MS / 1000) + " segundos para el próximo ciclo...");
+            System.out.println("⏳ Esperando " + EXECUTION_INTERVAL_SECONDS + " segundos para el próximo ciclo...");
 
         } catch (Exception e) {
             System.err.println("❌ ERROR en el ciclo de captura: " + e.getMessage());

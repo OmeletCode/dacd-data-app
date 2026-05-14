@@ -48,6 +48,12 @@
         .header h1 { margin: 0; font-size: 1.4rem; color: var(--accent); font-weight: 800; }
         .header p { margin: 8px 0 0; font-size: 0.85rem; color: var(--text-dim); }
 
+        .health-bar { display: flex; gap: 10px; margin-top: 15px; font-size: 0.6rem; font-weight: bold; text-transform: uppercase; }
+        .health-item { display: flex; align-items: center; gap: 5px; background: rgba(255,255,255,0.05); padding: 5px 10px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); }
+        .health-dot { height: 6px; width: 6px; border-radius: 50%; }
+        .status-ok { background: var(--low); box-shadow: 0 0 5px var(--low); }
+        .status-fail { background: var(--high); box-shadow: 0 0 5px var(--high); }
+
         .island-selector {
             width: 100%; padding: 12px; margin-bottom: 15px;
             background: rgba(0, 210, 255, 0.1); border: 1px solid var(--accent);
@@ -93,6 +99,14 @@
         <div class="live-status"><span class="dot"></span> LIVE TELEMETRY</div>
         <h1>🛰️ STARLINK MONITOR</h1>
         <p id="update-time">Sincronizando...</p>
+        <div class="health-bar" id="health-bar">
+            <div class="health-item">
+                <div id="status-spacex" class="health-dot status-fail"></div> SpaceX
+            </div>
+            <div class="health-item">
+                <div id="status-weather" class="health-dot status-fail"></div> Weather
+            </div>
+        </div>
     </div>
 
     <select id="island-select" class="island-selector" onchange="cambiarIsla()">
@@ -104,9 +118,25 @@
     </select>
 
     <div class="stat-group">
+        <div class="stat-card" style="border-color: var(--accent); background: rgba(0, 210, 255, 0.05);">
+            <div class="stat-label" style="color: var(--accent);">Modo de Visualización</div>
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+                <input type="range" id="history-slider" min="0" max="24" value="0" step="1" style="width: 100%; cursor: pointer;" oninput="cambiarModoHistorico()">
+                <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-dim);">
+                    <span>Ahora</span>
+                    <span id="slider-label">Hace 0h</span>
+                </div>
+            </div>
+        </div>
+
         <div class="stat-card">
             <div class="stat-label">Clima Actual</div>
             <div class="stat-value" id="clima-desc">--</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Atenuación Pico</div>
+            <div class="stat-value" id="peak-att">0.00 dB</div>
         </div>
 
         <div class="stat-card">
@@ -140,12 +170,15 @@
     };
 
     let currentIsland = "Las Palmas";
+    let historyHours = 0;
     let isFirstLoad = true;
     let currentMarker;
     let satelliteMarkers = [];
     let connectionLines = [];
+    let satelliteTrails = {}; // 🛰️ Almacén para estelas { satId: [LatLng, LatLng, ...] }
+    let trailLayers = []; // Capas físicas en el mapa
     let ws;
-    let tempChart; // 📈 Variable para guardar la gráfica
+    let tempChart;
 
     const map = L.map('map', { zoomControl: false }).setView(islasData[currentIsland], 9);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
@@ -156,7 +189,59 @@
         className: 'sat-marker-container', iconSize: [24, 24], iconAnchor: [12, 12]
     });
 
-    // 📈 FUNCIÓN PARA DIBUJAR/ACTUALIZAR LA GRÁFICA
+    function cambiarModoHistorico() {
+        historyHours = document.getElementById('history-slider').value;
+        document.getElementById('slider-label').innerText = `Hace ${historyHours}h`;
+        
+        const dot = document.querySelector('.dot');
+        const liveText = document.querySelector('.live-status');
+        
+        if (historyHours > 0) {
+            dot.style.backgroundColor = '#ffcc00';
+            dot.style.boxShadow = '0 0 10px #ffcc00';
+            dot.style.animation = 'none';
+            liveText.style.color = '#ffcc00';
+            liveText.innerHTML = '📜 MODO HISTÓRICO';
+        } else {
+            dot.style.backgroundColor = 'var(--low)';
+            dot.style.boxShadow = '0 0 10px var(--low)';
+            dot.style.animation = 'blink 1.5s infinite';
+            liveText.style.color = 'var(--low)';
+            liveText.innerHTML = '<span class="dot"></span> LIVE TELEMETRY';
+        }
+        
+        actualizarDashboard();
+    }
+
+    // 🛰️ FUNCIÓN PARA ACTUALIZAR ESTELAS (OPTIMIZADA)
+    function updateTrails(satellites) {
+        trailLayers.forEach(l => map.removeLayer(l));
+        trailLayers = [];
+
+        // Si estamos en modo histórico, no dibujamos estelas para evitar confusión visual
+        if (historyHours > 0) return;
+
+        // Solo dibujamos estelas para los 20 satélites más cercanos/relevantes para evitar lag
+        const visibleSats = satellites
+            .filter(s => s.elevation > 30) 
+            .slice(0, 20);
+
+        visibleSats.forEach(sat => {
+            const pos = [sat.latitude, sat.longitude];
+            if (!satelliteTrails[sat.id]) satelliteTrails[sat.id] = [];
+            
+            satelliteTrails[sat.id].unshift(pos);
+            if (satelliteTrails[sat.id].length > 3) satelliteTrails[sat.id].pop();
+
+            if (satelliteTrails[sat.id].length >= 2) {
+                const trail = L.polyline(satelliteTrails[sat.id], {
+                    color: '#00d2ff', weight: 1.2, opacity: 0.2, dashArray: '3, 3', interactive: false
+                }).addTo(map);
+                trailLayers.push(trail);
+            }
+        });
+    }
+
     function updateChart(historyData) {
         if (!historyData || historyData.length === 0) return;
 
@@ -205,32 +290,55 @@
     }
 
     function conectarWebSocket() {
-        ws = new WebSocket(`ws://${window.location.host}/ws/rainfade`);
+        ws = new WebSocket(`ws://${window.location.host}/ws/v1/rainfade`);
 
         ws.onopen = () => {
             console.log("✅ Conectado al radar en tiempo real");
             document.getElementById('update-time').innerText = "Conectado al satélite...";
-            ws.send(currentIsland);
+            actualizarDashboard();
         };
 
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
 
+            // 🩺 ACTUALIZACIÓN DE SALUD DE SERVICIOS (Siempre se debe actualizar)
+            if (data.healthStatus) {
+                const spx = document.getElementById('status-spacex');
+                const wtr = document.getElementById('status-weather');
+                
+                if (data.healthStatus["SpaceX-Feeder"] === "OK") {
+                    spx.className = "health-dot status-ok";
+                } else {
+                    spx.className = "health-dot status-fail";
+                }
+
+                if (data.healthStatus["Weather-Feeder"] === "OK") {
+                    wtr.className = "health-dot status-ok";
+                } else {
+                    wtr.className = "health-dot status-fail";
+                }
+            }
+
             if (!data.predictions || data.predictions.length === 0) {
-                document.getElementById('update-time').innerText = "⚠️ BUSCANDO SEÑAL...";
-                document.getElementById('update-time').style.color = "#ffcc00";
+                document.getElementById('update-time').innerText = "⚠️ SIN DATOS PARA ESTA ZONA";
+                document.getElementById('update-time').style.color = "#ff3366";
+                document.getElementById('clima-desc').innerText = "Esperando señal...";
+                document.getElementById('sat-count').innerText = "0";
+                document.getElementById('riesgo').innerText = "---";
+                document.getElementById('risk-box').className = "risk-display";
                 return;
             }
 
             const p = data.predictions[0];
-            const timestamp = new Date().toLocaleTimeString();
+            const timestamp = historyHours > 0 ? new Date(data.timestamp).toLocaleString() : new Date().toLocaleTimeString();
             const coordsActuales = islasData[currentIsland];
             const riesgoNormalizado = p.risk ? p.risk.toUpperCase().trim() : "LOW";
 
-            document.getElementById('update-time').innerText = `En directo: ${timestamp}`;
-            document.getElementById('update-time').style.color = "rgba(0, 255, 136, 0.8)";
-            document.getElementById('clima-desc').innerText = `${p.weather.description} (${p.weather.temperature.toFixed(1)}ºC)`;
+            document.getElementById('update-time').innerText = historyHours > 0 ? `Viendo: ${timestamp}` : `En directo: ${timestamp}`;
+            document.getElementById('update-time').style.color = historyHours > 0 ? "#ffcc00" : "rgba(0, 255, 136, 0.8)";
+            document.getElementById('clima-desc').innerText = `${p.weather.description} (${p.weather.temperature.toFixed(2)}ºC)`;
             document.getElementById('sat-count').innerText = p.satellites ? p.satellites.length : 0;
+            document.getElementById('peak-att').innerText = `${p.maxAttenuationDb.toFixed(2)} dB`;
             document.getElementById('riesgo').innerText = riesgoNormalizado;
             document.getElementById('risk-box').className = `risk-display risk-${riesgoNormalizado}`;
 
@@ -250,10 +358,15 @@
             satelliteMarkers = []; connectionLines = [];
 
             if (p.satellites) {
+                updateTrails(p.satellites);
                 p.satellites.forEach(sat => {
                     if (sat.latitude !== 0 || sat.longitude !== 0) {
                         const m = L.marker([sat.latitude, sat.longitude], { icon: satelliteIcon }).addTo(map);
-                        m.bindTooltip(`ID: ${sat.id}`, { direction: 'top', offset: [0, -10] });
+                        m.bindTooltip(`
+                            <b>ID: ${sat.id}</b><br>
+                            Elevación: ${sat.elevation.toFixed(1)}º<br>
+                            Pérdida: ${sat.attenuationDb.toFixed(2)} dB
+                        `, { direction: 'top', offset: [0, -10] });
                         satelliteMarkers.push(m);
 
                         if (riesgoNormalizado === 'MEDIUM' || riesgoNormalizado === 'HIGH') {
@@ -280,18 +393,16 @@
         currentIsland = document.getElementById('island-select').value;
         map.flyTo(islasData[currentIsland], 9, { duration: 1.5 });
 
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(currentIsland);
-
-            // Ponemos la UI en "Buscando..." temporalmente hasta que el server conteste
-            document.getElementById('update-time').innerText = "⚠️ BUSCANDO SEÑAL...";
-            document.getElementById('update-time').style.color = "#ffcc00";
-        }
+        actualizarDashboard();
+        
+        // Ponemos la UI en "Buscando..." temporalmente hasta que el server conteste
+        document.getElementById('update-time').innerText = "⚠️ BUSCANDO SEÑAL...";
+        document.getElementById('update-time').style.color = "#ffcc00";
     }
 
     function actualizarDashboard() {
         if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(currentIsland);
+            ws.send(`${currentIsland}:${historyHours}`);
         } else {
             conectarWebSocket();
         }

@@ -1,4 +1,4 @@
-package org.ulpgc.starlink.weather.infrastructure.broker;
+package org.ulpgc.starlink.weather.control;
 
 import com.google.gson.Gson;
 

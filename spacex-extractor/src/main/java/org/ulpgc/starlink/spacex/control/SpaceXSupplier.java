@@ -1,4 +1,4 @@
-package org.ulpgc.starlink.spacex.infrastructure.api;
+package org.ulpgc.starlink.spacex.control;
 
 import org.ulpgc.starlink.spacex.model.SatelliteEvent;
 

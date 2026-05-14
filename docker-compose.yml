@@ -1,111 +1,90 @@
-  services:
+services:
 
-    activemq:
-      image: rmohr/activemq:latest
-      container_name: starlink-broker
+  activemq:
+    image: rmohr/activemq:latest
+    container_name: starlink-broker
+    ports:
+      - "61616:61616"
+      - "8161:8161"
+    networks:
+      - starlink-network
 
-      ports:
-        - "61616:61616"
-        - "8161:8161"
+  event-store-builder:
+    build:
+      context: .
+      dockerfile: event-store-builder/Dockerfile
+    container_name: starlink-event-store
+    volumes:
+      - ./event-store-builder/eventstore:/app/eventstore
+    environment:
+      - ACTIVEMQ_URL=tcp://activemq:61616
+    depends_on:
+      - activemq
+    networks:
+      - starlink-network
 
-      networks:
-        - starlink-network
+  rain-fade-monitor:
+    build:
+      context: .
+      dockerfile: rain-fade-monitor/Dockerfile
+    container_name: starlink-monitor-service
+    volumes:
+      - ./event-store-builder/eventstore:/app/eventstore
+      - ./datamart.db:/app/datamart.db
+    environment:
+      - ACTIVEMQ_URL=tcp://activemq:61616
+    ports:
+      - "7000:7000"
+    depends_on:
+      - activemq
+    networks:
+      - starlink-network
 
-    event-store-builder:
-      image: maven:3.9.6-eclipse-temurin-21
-      container_name: starlink-event-store
+  weather-extractor:
+    build:
+      context: .
+      dockerfile: weather-extractor/Dockerfile
+    container_name: starlink-weather-extractor
+    environment:
+      - ACTIVEMQ_URL=tcp://activemq:61616
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+    depends_on:
+      - activemq
+    networks:
+      - starlink-network
 
-      working_dir: /app/event-store-builder
+  spacex-extractor:
+    build:
+      context: .
+      dockerfile: spacex-extractor/Dockerfile
+    container_name: starlink-spacex-extractor
+    environment:
+      - ACTIVEMQ_URL=tcp://activemq:61616
+    depends_on:
+      - activemq
+    networks:
+      - starlink-network
 
-      volumes:
-        - .:/app
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: starlink-prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - starlink-network
 
-      environment:
-        - ACTIVEMQ_URL=tcp://activemq:61616
+  grafana:
+    image: grafana/grafana:latest
+    container_name: starlink-grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - starlink-network
 
-      command: >
-        mvn compile exec:java
-        -Dexec.mainClass="org.ulpgc.starlink.eventstore.Main"
-
-      depends_on:
-        - activemq
-
-      networks:
-        - starlink-network
-
-    rain-fade-monitor:
-      image: maven:3.9.6-eclipse-temurin-21
-      container_name: starlink-monitor-service
-
-      working_dir: /app/rain-fade-monitor
-
-      volumes:
-        - .:/app
-
-      environment:
-        - ACTIVEMQ_URL=tcp://activemq:61616
-
-      command: >
-            mvn compile exec:java
-            -Dexec.mainClass="org.ulpgc.starlink.monitor.Main"
-            -Dexec.args="/app/event-store-builder/eventstore /app/datamart.db"
-
-      ports:
-        - "7000:7000"
-
-      depends_on:
-        - activemq
-
-      networks:
-        - starlink-network
-
-    weather-extractor:
-      image: maven:3.9.6-eclipse-temurin-21
-      container_name: starlink-weather-extractor
-
-      working_dir: /app/weather-extractor
-
-      volumes:
-        - .:/app
-
-      environment:
-        - ACTIVEMQ_URL=tcp://activemq:61616
-        - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
-
-      command: >
-        mvn compile exec:java
-        -Dexec.mainClass="org.ulpgc.starlink.weather.Main"
-
-      depends_on:
-        - activemq
-
-      networks:
-        - starlink-network
-
-    spacex-extractor:
-      image: maven:3.9.6-eclipse-temurin-21
-      container_name: starlink-spacex-extractor
-
-      working_dir: /app/spacex-extractor
-
-      volumes:
-        - .:/app
-
-      environment:
-        - ACTIVEMQ_URL=tcp://activemq:61616
-
-      command: >
-        mvn compile exec:java
-        -Dexec.mainClass="org.ulpgc.starlink.spacex.Main"
-
-      depends_on:
-        - activemq
-
-      networks:
-        - starlink-network
-
-  networks:
-
-    starlink-network:
-      driver: bridge
-
+networks:
+  starlink-network:
+    driver: bridge

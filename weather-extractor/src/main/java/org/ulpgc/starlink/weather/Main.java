@@ -1,7 +1,7 @@
 package org.ulpgc.starlink.weather;
 
 import org.ulpgc.starlink.weather.control.WeatherController;
-import org.ulpgc.starlink.weather.infrastructure.api.WeatherSupplier;
+import org.ulpgc.starlink.weather.control.WeatherSupplier;
 
 public class Main {
     private static final String API_KEY_ENV_VAR = "OPENWEATHER_API_KEY";

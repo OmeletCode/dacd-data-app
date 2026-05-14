@@ -1,178 +1,248 @@
 
 ---
 
-# 🛰️ Starlink Rain Fade Monitor - Proyecto DACD
+# 🛰️ Starlink Rain Fade Monitor - Proyecto DACD (V2.0)
 
 **Desarrollo de Aplicaciones para Ciencia de Datos**
 Grado en Ciencia e Ingeniería de Datos | ULPGC
 
 👨‍💻 **Desarrolladores:** Pablo Mellado y Yone Suárez
-☕ **Tecnología:** Java 21 (Modular Maven Project) | Apache ActiveMQ | Javalin | Leaflet.js
+☕ **Tecnología:** Java 21 | Apache ActiveMQ | Javalin | SQLite (WAL Mode) | Leaflet.js | Chart.js
 
 ---
 
-## 💡 Propuesta de Valor: Monitorización Predictiva de "Rain Fade"
+## 💡 Propuesta de Valor: Monitorización Predictiva y Análisis Histórico
 
-El **Rain Fade** (atenuación por lluvia) es el principal factor de inestabilidad en las conexiones satelitales que operan en la Banda Ku (como Starlink de SpaceX). El objetivo de este sistema es actuar como un Monitor Predictivo, cruzando dos flujos de datos dinámicos en tiempo real:
+El **Rain Fade** (atenuación por lluvia) es el factor crítico de inestabilidad en conexiones satelitales de Banda Ku (Starlink). Este sistema actúa como un monitor preventivo que cruza telemetría orbital en tiempo real con datos meteorológicos de alta precisión.
 
-1. **Telemetría Orbital:** Posición exacta (Latitud/Longitud) de los satélites de la constelación SpaceX.
-2. **Meteorología Crítica:** Intensidad de precipitación y densidad de nubes (OpenWeatherMap) en las Islas Canarias.
-
-**Resultado:** Un tablero de control que predice microcortes y alerta visualmente al usuario mediante un código de colores de riesgo y mapeo de interferencias antes de que se produzca la degradación de la señal. Esto aporta un valor crítico a nómadas digitales, empresas y trabajadores autónomos en Canarias que dependen de conexiones satelitales estables para operar.
+**Novedad V2.0:** Se ha implementado un **Modo Histórico (Time Travel)** que permite retroceder hasta 24 horas para analizar eventos pasados, optimizando el motor de datos para manejar flujos masivos de eventos sin degradar el rendimiento del hardware.
 
 ---
 
-## 🛠️ Justificación de Tecnologías y Datos
+## 🛠️ Justificación Técnica
 
 ### Elección de APIs
-*   **OpenWeatherMap:** Se ha seleccionado por su capacidad de proporcionar datos de **precipitación (rain intensity)** y **cobertura de nubes** con alta frecuencia de actualización. Estos parámetros son las variables de entrada críticas para el modelo matemático de atenuación.
-*   **SpaceX API (Leaf):** Proporciona la telemetría en tiempo real de los satélites Starlink. Se utiliza para calcular el ángulo de elevación respecto a la estación de tierra, factor clave en la pérdida de señal por el camino que recorre la onda a través de la atmósfera.
+*   **OpenWeatherMap:** Seleccionada por su granularidad en datos de precipitación (rain intensity) y cobertura de nubes, esenciales para el modelo matemático ITU-R P.618.
+*   **SpaceX API (Leaf):** Proporciona la telemetría exacta (Lat/Lon) de la constelación Starlink necesaria para calcular ángulos de elevación dinámicos.
 
-### Estructura del Datamart
-Se ha optado por **SQLite** como motor de persistencia para el Datamart debido a su naturaleza *serverless*, lo que facilita la portabilidad y entrega del proyecto.
-*   **Tablas Principales:**
-    *   `satellites`: Almacena la última posición conocida de cada satélite identificado.
-    *   `weather`: Registra las condiciones climáticas actuales por zona geográfica.
-    *   `predictions`: Tabla calculada que cruza satélites y clima para determinar el riesgo de pérdida de señal.
-*   **Modo WAL:** Se activa el modo *Write-Ahead Logging* para permitir que el proceso de ingesta de datos no bloquee las consultas de la interfaz gráfica.
+### Estructura del Datamart (SQLite High-Performance)
+Se ha optado por **SQLite** por su portabilidad, pero aplicando optimizaciones de nivel industrial:
+*   **Modo WAL (Write-Ahead Logging):** Permite que la UI lea datos mientras los extractores escriben, eliminando bloqueos de base de datos.
+*   **Índices Compuestos:** Optimizados para consultas de series temporales (`location`, `timestamp DESC`).
+*   **Idempotencia:** Claves primarias únicas para evitar duplicados en el histórico tras reinicios.
 
 ---
 
-## 🏗️ Arquitectura del Sistema (Multimódulo EDA)
+## 🏗️ Arquitectura del Sistema (Three-Tier & Lambda)
 
-El proyecto implementa una arquitectura de **Microservicios Desacoplados** comunicados mediante un bus de eventos (Event-Driven Architecture), diseñada bajo los principios de *Clean Code* y maximizando el principio DRY:
+El sistema está diseñado siguiendo un modelo de **Tres Capas (Three-Tier)** distribuido físicamente mediante contenedores:
 
-### Módulos del Proyecto
-* **`spacex-extractor` & `weather-extractor` (Productores):** Feeders que capturan telemetría orbital y clima local desde APIs externas, inyectándolos en el ecosistema (topics `sensor.SpaceX` y `prediction.Weather`).
-* **`event-store-builder` (Data Lake):** Implementa el patrón *Durable Subscriber*, escuchando al broker y persistiendo los eventos crudos en formato NDJSON. Actúa como la *Single Source of Truth* histórica.
-* **`rain-fade-monitor` (Business Unit & API):** El cerebro del sistema. Implementa una **Arquitectura Lambda**, cargando históricos del Event Store (batch) y sincronizando el estado en tiempo real vía ActiveMQ (stream). Persiste y consulta datos en un **Datamart SQLite**.
+1.  **Presentation Tier:** Interfaz Web (HTML/JS) que actúa como un **Passive View**, limitándose a renderizar los datos recibidos sin lógica de negocio.
+2.  **Application Tier:** El microservicio `rain-fade-monitor` (Java/Javalin) que implementa las reglas de negocio (modelo ITU-R P.618).
+3.  **Data Tier:** Persistencia mediante **Data Marts** locales optimizados.
 
-### 🗺️ Diagrama de Arquitectura Unificada
+### Modelo de Integración EAI
+En lugar de una integración punto a punto (P2P), el sistema utiliza un modelo de **Integración de Aplicaciones Empresariales (EAI)** mediante **Apache ActiveMQ** como middleware. Esto permite un desacoplamiento total entre los productores de datos (Extractores) y los consumidores.
 
+### Implementación de Arquitectura Lambda
+Para garantizar la integridad y disponibilidad de los datos, el sistema implementa una **Arquitectura Lambda**:
+
+*   **Data Lake (Batch Layer):** El `event-store-builder` gestiona un **Data Lake** inmutable en formato NDJSON. Es la "fuente de la verdad" que contiene el histórico completo de eventos en su formato original.
+*   **Speed Layer:** El suscriptor de ActiveMQ en el monitor procesa los eventos en tiempo real para compensar la latencia de la capa batch.
+*   **Serving Layer (Data Mart):** El Datamart SQLite actúa como un **Data Mart** especializado, una vista parcial y optimizada del Data Lake lista para ser consumida con el mínimo coste de computación.
+
+---
+
+### Diagrama de Arquitectura de Datos
 ```mermaid
 graph TD
-    subgraph "Productores (Sprint 1)"
+    subgraph "Productores"
         WE[Weather Extractor]
         SE[SpaceX Extractor]
     end
 
-    subgraph "Middleware (Sprint 2)"
+    subgraph "Middleware (EAI - ActiveMQ)"
         B[ActiveMQ Broker]
+    end
+
+    subgraph "Batch Layer (Data Lake)"
         ES[Event Store Builder]
-        HD[(Event Store Files .events)]
+        HD[(Event Store: NDJSON)]
     end
 
-    subgraph "Inteligencia (Sprint 3)"
-        AS[Suscriptor Tiempo Real]
-        ER[Lector Histórico]
-        DM[(Datamart SQLite)]
-        API[Javalin WebServer / WS]
+    subgraph "Speed & Serving Layer"
+        AS[Real-Time Subscriber]
+        ER[Batch View Loader]
+        DM[(Data Mart: SQLite WAL)]
     end
 
-    GUI[Dashboard Web UI]
+    subgraph "Presentation (Passive View)"
+        GUI[Web Dashboard]
+    end
 
-    WE --->|Publish| B
-    SE --->|Publish| B
+    WE & SE --->|Publish| B
     B --->|Durable Sub| ES
     ES --->|Append| HD
     B --->|Listen| AS
-    HD --->|Read| ER
+    HD --->|Query| ER
     AS & ER --> DM
-    DM <---> API
-    API <---> GUI
+    DM <---> GUI
 ```
 
-### 🧬 Diagrama de Clases Principal
-
+### Diagrama de Clases (Principales Componentes)
 ```mermaid
 classDiagram
-    class WeatherController {
-        -WeatherSupplier supplier
-        -ActiveMQMessageSender sender
-        +execute()
-    }
-    class SpaceXController {
-        -SpaceXSupplier supplier
-        -ActiveMQMessageSender sender
-        +execute()
-    }
-    class EventStoreBuilder {
-        -ActiveMQSubscriber sub
-        -FileEventStore store
-    }
     class RainFadeService {
-        -SQLiteDataMart dataMart
-        +getPredictionsForLocation(String)
+        +getPredictionsForLocationAt(String, String)
+        -calculateElevation()
+        -ITU_R_P618_Model()
     }
     class SQLiteDataMart {
-        -String dbUrl
-        +enableWALMode()
         +save(JsonObject)
-        +getLatestWeather(String)
+        +getLatestWeatherByTime()
+        +getActiveSatellitesByTime()
     }
     class RainFadeController {
-        -RainFadeService service
-        -Javalin app
-        +start(int)
+        -Map activeSessions
+        +startBroadcaster()
+        +addSession(WsContext, String)
+    }
+    class ActiveMQSubscriber {
+        -MessageListener listener
     }
 
-    WeatherController ..> ActiveMQMessageSender
-    SpaceXController ..> ActiveMQMessageSender
-    EventStoreBuilder ..> FileEventStore
     RainFadeController --> RainFadeService
     RainFadeService --> SQLiteDataMart
+    ActiveMQSubscriber --> SQLiteDataMart
 ```
 
 ---
 
-## 🧩 Patrones de Diseño y Decisiones Técnicas
+## 🧩 Principios y Patrones de Diseño
 
-* **Arquitectura Lambda:** Unifica el procesamiento por lotes (batch) de 40k+ eventos históricos con el flujo en tiempo real (stream), garantizando que el monitor siempre tenga datos previos para las gráficas.
-* **Java Records (Java 21):** Uso de inmutabilidad para modelos como `WeatherEvent` y `SatelliteEvent`, asegurando la integridad de los datos en entornos concurrentes.
-* **Publisher/Subscriber (Observer):** Desacoplamiento total mediante ActiveMQ. Los extractores no conocen al monitor ni al event store.
-* **SQLite WAL Mode (Write-Ahead Logging):** Configuración avanzada de la base de datos que permite lecturas y escrituras simultáneas. Vital para que la carga de históricos no bloquee la visualización en el mapa.
-* **WebSockets (Full Duplex):** El monitor "empuja" actualizaciones cada 2 segundos a los clientes conectados, eliminando la necesidad de refrescar la página.
+*   **Observer (Pub/Sub):** Desacoplamiento total entre extractores y monitor mediante ActiveMQ.
+*   **Controller-Service-Repository:** Separación de responsabilidades en la `business-unit`.
+*   **Durable Subscriber:** Garantiza que los mensajes del broker se persistan aunque el monitor esté offline.
+*   **Clean Code:** Uso de Java Records para inmutabilidad de modelos y gestión de excepciones robusta.
+
+### 3. Paralelización y Concurrencia (Java Concurrency API)
+El sistema aprovecha las capacidades multihilo de Java para maximizar el rendimiento:
+*   **Thread-Safe SQLite:** Acceso sincronizado al Datamart para permitir lecturas (UI) y escrituras (Extractores) simultáneas sin corrupción de datos.
+*   **Extracción Paralela (`CompletableFuture`):** El `WeatherExtractor` ahora realiza peticiones HTTP en paralelo para todas las ubicaciones configuradas.
+*   **Cálculo Distribuido (`parallelStream`):** El motor de predicción procesa los cientos de satélites en paralelo utilizando el ForkJoinPool de Java.
+*   **WebSocket Broadcaster:** Uso de un `ExecutorService` con pool de hilos para enviar actualizaciones a múltiples clientes Web simultáneamente sin bloquear el ciclo principal.
+*   **Monitorización de Hilos:** Se recomienda el uso de **JVisualVM** para inspeccionar el estado de los hilos, detectar bloqueos (deadlocks) y optimizar el consumo de memoria en tiempo real.
+
+### 4. Modelos Inmutables y Event Sourcing
+El sistema aplica principios estrictos de diseño orientado a objetos y persistencia:
+*   **Java Records:** Todos los modelos de dominio (`WeatherEvent`, `SatelliteEvent`, `RainFadeResponse`) están implementados como **Records**. Esto garantiza que los objetos sean **inmutables** por diseño: no tienen mutadores (setters), todos sus campos son finales y son intrínsecamente seguros para hilos (thread-safe).
+*   **Event Sourcing:** Cada cambio de estado en el sistema se captura como un evento inmutable. 
+    *   **Data Lake Replay:** El `EventStoreReader` permite la **reconstrucción completa** o parcial del estado de la aplicación reproduciendo los eventos almacenados en el Data Lake.
+    *   **Integridad:** Los eventos almacenados nunca se modifican, solo se añaden nuevos (append-only), permitiendo auditar y corregir el estado en cualquier momento.
+
+### 5. Mensajería Asíncrona (ActiveMQ Topics)
+El middleware utiliza el patrón de **Topics** (Publicador/Suscriptor):
+*   **Escalabilidad:** Múltiples suscriptores (como el `event-store-builder` y el `rain-fade-monitor`) pueden recibir los mismos eventos de forma asíncrona y simultánea sin interferir entre sí.
+*   **Garantía de Transmisión:** El uso de suscripciones durables asegura que los eventos no se pierdan incluso si un consumidor está temporalmente fuera de línea, cumpliendo con la responsabilidad de transmisión garantizada.
+
+### 6. Principios SOLID y Patrones de Diseño
+El código sigue los estándares de la Ingeniería de Software para garantizar su mantenibilidad:
+
+*   **Single Responsibility (SRP):** Cada microservicio y clase tiene una única razón para cambiar. Por ejemplo, los extractores solo se encargan de la obtención de datos, mientras que el monitor solo gestiona la lógica de atenuación.
+*   **Open/Closed (OCP):** El sistema es extensible. Se pueden añadir nuevas ubicaciones o nuevos tipos de satélites sin modificar la lógica central del monitor.
+*   **Liskov Substitution (LSP):** El uso de interfaces como `DataMart` permite intercambiar la implementación de SQLite por cualquier otra base de datos (PostgreSQL, MongoDB) sin afectar a los servicios.
+*   **Interface Segregation (ISP):** Las interfaces son específicas y granulares para evitar dependencias innecesarias.
+*   **Dependency Inversion (DIP):** Los servicios de alto nivel (`RainFadeService`) no dependen de implementaciones concretas (`SQLiteDataMart`), sino de abstracciones (`DataMart`), facilitando las pruebas y el intercambio de componentes.
+
+### 7. Patrones de Arquitectura Avanzados
+*   **CQRS (Command Query Responsibility Segregation):** El sistema separa las operaciones de escritura (Extractores enviando eventos) de las de lectura (UI consultando el Data Mart), utilizando modelos de datos diferentes para cada propósito.
+*   **MVC (Model-View-Controller):** 
+    *   **Model:** Java Records inmutables.
+    *   **View:** Dashboard Web (Passive View).
+    *   **Controller:** `RainFadeController` gestionando el flujo de datos.
+*   **Observer:** Implementado de forma distribuida mediante los **Topics** de ActiveMQ.
+
+### 8. Web APIs y Estrategia de Scraping
+El sistema expone y consume interfaces siguiendo los estándares modernos:
+
+*   **REST API v1:** El monitor expone una API REST versionada bajo el prefijo `/api/v1/`.
+    *   `GET /api/v1/health`: Verifica la salud del sistema (200 OK).
+    *   `GET /api/v1/predictions/{location}?hours=X`: Permite consultas puntuales de predicciones para una ubicación y tiempo histórico específicos.
+*   **WebSockets v1:** Comunicación bidireccional en tiempo real bajo `/ws/v1/rainfade` para actualizaciones de telemetría sin sobrecarga de cabeceras HTTP.
+*   **Scraping y Consumo de APIs Externas:**
+    *   **Consumo de APIs:** Se utilizan librerías como **OkHttp** para realizar peticiones eficientes y robustas a OpenWeatherMap y SpaceX.
+    *   **Estrategia de Extracción:** El sistema actúa como un "scraper" de datos meteorológicos y orbitales, transformando información semi-estructurada (JSON/HTTP) en eventos inmutables de alta calidad para el Data Lake.
+
+### 9. Java IO, Serialización y Codificación
+El sistema implementa las mejores prácticas de entrada/salida y persistencia de datos:
+*   **Gestión de Recursos (`try-with-resources`):** Todas las conexiones a bases de datos, brokers de mensajería (ActiveMQ) y flujos de archivos utilizan el patrón *try-with-resources* de Java para garantizar el cierre automático y seguro de descriptores de archivos y sockets.
+*   **IO Eficiente y Buffering:** 
+    *   **Lectura:** El `EventStoreReader` utiliza `Files.lines()`, que implementa internamente un `BufferedReader` para procesar flujos masivos de eventos NDJSON de forma eficiente sin saturar la memoria.
+    *   **Escritura:** Los extractores envían mensajes de forma asíncrona, aprovechando los buffers de red del sistema operativo y del cliente ActiveMQ.
+*   **Serialización JSON (Gson):** Se utiliza **JSON** como formato de intercambio universal. La librería **Gson** permite transformar los objetos (Records) en cadenas de texto para su transmisión por red y almacenamiento en disco, garantizando la interoperabilidad entre microservicios.
+*   **Codificación Universal (UTF-8):** Todo el sistema opera bajo el estándar **UTF-8**, asegurando que los caracteres especiales (como nombres de ubicaciones internacionales) se procesen y almacenen correctamente en cualquier sistema operativo.
 
 ---
 
 ## ⚙️ Requisitos y Ejecución
 
-### Opción A: Ejecución Rápida (Recomendado) 🐋
-El proyecto está totalmente contenedorizado. Solo necesitas Docker Desktop instalado:
+### 🐋 Ejecución con Docker (Recomendado)
+El proyecto orquestra 5 servicios: ActiveMQ, Weather Extractor, SpaceX Extractor, Event Store Builder y Rain Fade Monitor.
 
-1. Clona el repositorio.
-2. Abre una terminal en la raíz y ejecuta:
-   ```bash
-   docker-compose up --build
-   ```
-3. Accede a `http://localhost:7000`.
-
-### Opción B: Ejecución Manual (Entorno Local)
-1. **Requisitos:** Java 21, Maven y ActiveMQ (61616).
-2. **Variable de Entorno:** Exporta `OPENWEATHER_API_KEY`.
-3. **Instalación:** `mvn clean install`.
-4. **Orden de arranque:** ActiveMQ -> EventStoreBuilder -> RainFadeMonitor -> Extractores.
+1.  **Configurar API Key:**
+    ```powershell
+    $env:OPENWEATHER_API_KEY="tu_clave_aqui"
+    ```
+2.  **Lanzamiento:**
+    ```bash
+    docker-compose up --build
+    ```
+3.  **Acceso:** `http://localhost:7000`
 
 ---
 
-## 📊 Explotación de Datos
+## 🚀 Despliegue y Monitorización (Ingeniería de Software)
 
-La Business Unit expone los datos procesados para su integración:
+El proyecto integra un stack completo de observabilidad y despliegue automatizado:
 
-### 1. API WebSocket (Tiempo Real)
-* **Endpoint:** `ws://localhost:7000/ws/rainfade`
-* **Mensaje de entrada:** `"Las Palmas"`, `"London"`, etc.
-* **Respuesta:** JSON con telemetría, historial térmico y riesgo de interferencia.
+### 1. CI/CD (GitHub Actions)
+*   **Pipeline Automatizado:** El flujo `.github/workflows/maven.yml` realiza dos tareas críticas:
+    1.  **Build & Test:** Compila el proyecto con Maven.
+    2.  **Docker Build Check:** Verifica que los `Dockerfiles` de cada microservicio sean válidos y construyan imágenes funcionales.
 
-### 2. Dashboard Web (GUI)
-Accede a `http://localhost:7000/`. El panel incluye:
-* **Mapa Leaflet:** Visualización de satélites y líneas de interferencia.
-* **Chart.js:** Gráfica de evolución térmica de las últimas 10 capturas.
-* **Monitor de Riesgo:** Indicador dinámico (LOW/MEDIUM/HIGH) basado en el clima.
+### 2. Monitorización y Observabilidad
+*   **Logging Estructurado (Logback):** Todos los módulos generan logs profesionales.
+    *   **Consola + Archivo:** Cada servicio escribe en su propio archivo en la carpeta `/logs` (ej. `weather-extractor.log`).
+*   **Métricas con Micrometer & Prometheus:** 
+    *   **Endpoint `/metrics`:** El monitor expone métricas en tiempo real en formato Prometheus.
+    *   **Custom Metrics:** Se trackea el número total de conexiones WebSocket (`websocket_connections_total`).
+*   **Stack de Visualización:**
+    *   **Prometheus:** Recolecta métricas cada 15s (`http://localhost:9090`).
+    *   **Grafana:** Listo para crear dashboards personalizados (`http://localhost:3000`).
+
+### 3. Despliegue con Docker
+El sistema utiliza imágenes **multietapa** (distroless-like) basadas en JRE 21 para minimizar el tamaño y la superficie de ataque.
+
+| Servicio | Puerto | Descripción |
+| :--- | :--- | :--- |
+| **ActiveMQ** | 61616 / 8161 | Broker de mensajería y panel web. |
+| **Rain Fade Monitor** | 7000 | Backend Javalin, UI y métricas. |
+| **Prometheus** | 9090 | Base de datos de series temporales. |
+| **Grafana** | 3000 | Visualización de dashboards. |
 
 ---
 
-## 📂 Muestra de Datos
-Para cumplir con los requisitos de la entrega, se han incluido ejemplos de los datos generados en el directorio `/sample-data`:
-*   **Event Store (`/sample-data/eventstore`):** Ejemplos de eventos NDJSON capturados por los feeders (SpaceX y Weather).
-*   **Datamart:** El esquema y estado del sistema se persisten en `datamart.db` (incluido en la raíz para la demo).
+## 📊 Muestra de Datos y Uso
+
+### Ejemplos de Uso (API WebSocket)
+El servidor escucha en `ws://localhost:7000/ws/rainfade`.
+*   **Mensaje para tiempo real:** `"Las Palmas"`
+*   **Mensaje para histórico:** `"London:5"` (Ver datos de Londres de hace 5 horas).
+
+### Datos de Ejemplo
+El repositorio incluye la carpeta `/sample-data` con:
+*   **Event Store:** Archivos `.events` reales capturados durante el desarrollo.
+*   **Datamart:** Una muestra de la base de datos `datamart-sample.sqlite`.
+
+---
+**DACD 2026** | *Building resilient data systems.*
